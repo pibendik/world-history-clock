@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """What Year Does It Look Like? — Maps current military time HH:MM to a year."""
 
+import json
 import os
 import sys
 import time
@@ -8,6 +9,7 @@ import random
 import urllib.parse
 import requests
 from datetime import datetime
+from pathlib import Path
 
 # ANSI codes
 RESET  = "\033[0m"
@@ -64,23 +66,6 @@ def fetch_wikidata(year: int) -> str | None:
         return None
 
 
-def fetch_wikipedia(year: int) -> str | None:
-    """Fallback: Wikipedia REST summary for the year page."""
-    try:
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{year}"
-        resp = requests.get(url, headers=WIKIDATA_HEADERS, timeout=8)
-        if not resp.ok:
-            return None
-        extract = resp.json().get("extract", "").strip()
-        if extract and len(extract) > 20:
-            # Trim to ~2 sentences so it fits the display
-            sentences = extract.split(". ")
-            return ". ".join(sentences[:2]) + ("." if len(sentences) > 1 else "")
-        return None
-    except (requests.RequestException, ValueError, KeyError):
-        return None
-
-
 def fetch_numbersapi(year: int) -> str | None:
     """Tertiary: Numbers API (may be unreachable, kept as last resort)."""
     try:
@@ -101,9 +86,6 @@ def fetch_fact(year: int) -> tuple[str | None, bool, str | None]:
     fact = fetch_wikidata(year)
     if fact:
         return fact, True, "Wikidata"
-    fact = fetch_wikipedia(year)
-    if fact:
-        return fact, True, "Wikipedia"
     fact = fetch_numbersapi(year)
     if fact:
         return fact, True, "Numbers API"
@@ -158,16 +140,70 @@ def render(now: datetime, year: int, fact: str | None, network_ok: bool, source:
         for line in word_wrap(fact):
             print(f"{DIM}{line}{RESET}")
     elif not network_ok:
-        print(f"  {RED}(No data — all sources unreachable){RESET}")
+        print(f"  {YELLOW}(No specific records found for year {year} — try a nearby minute){RESET}")
     else:
         print(f"  {YELLOW}(Fetching…){RESET}")
 
     print()
     print(f"{CYAN}{BOLD}{'─' * 52}{RESET}")
-    print(f"{DIM}  Ctrl+C to quit{RESET}")
+    print(f"{DIM}  Press Ctrl+C to quit · Run with --saved to view saved{RESET}")
+
+
+def get_log_path() -> Path:
+    log_dir = Path.home() / ".clockapp"
+    log_dir.mkdir(exist_ok=True)
+    return log_dir / "auto_log.json"
+
+
+def auto_log_entry(year: int, fact: str, source: str | None):
+    """Append a new year entry to the auto-log when the year changes."""
+    path = get_log_path()
+    try:
+        entries = json.loads(path.read_text()) if path.exists() else []
+    except (json.JSONDecodeError, OSError):
+        entries = []
+    entries.insert(0, {
+        "year": year,
+        "text": fact,
+        "source": source,
+        "savedAt": datetime.now().isoformat(),
+    })
+    try:
+        path.write_text(json.dumps(entries, indent=2, ensure_ascii=False))
+    except OSError:
+        pass
+
+
+def print_saved():
+    """Print all auto-logged facts and exit."""
+    path = get_log_path()
+    if not path.exists():
+        print("No saved facts yet. Run the clock to start logging.")
+        return
+    try:
+        entries = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        print("Could not read saved facts.")
+        return
+    if not entries:
+        print("No saved facts yet.")
+        return
+    print(f"{CYAN}{BOLD}{'─' * 52}{RESET}")
+    print(f"{BOLD}  Saved / Auto-logged Facts ({len(entries)}){RESET}")
+    print(f"{CYAN}{BOLD}{'─' * 52}{RESET}")
+    for e in entries:
+        source_tag = f" [{e.get('source', '?')}]" if e.get('source') else ""
+        print(f"\n  {YELLOW}Year {e['year']}{RESET}{DIM}{source_tag}{RESET}")
+        for line in word_wrap(e.get('text', '(no text)')):
+            print(f"{DIM}{line}{RESET}")
+    print(f"\n{CYAN}{BOLD}{'─' * 52}{RESET}")
 
 
 def main():
+    if '--saved' in sys.argv:
+        print_saved()
+        return
+
     last_year = -1
     current_fact = None
     network_ok = True
@@ -184,6 +220,7 @@ def main():
                 current_fact = fact
                 network_ok = True
                 current_source = source
+                auto_log_entry(year, fact, source)
             else:
                 network_ok = False
                 current_source = None

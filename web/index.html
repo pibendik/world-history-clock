@@ -246,6 +246,70 @@
       background: var(--accent-dim);
       color: var(--text-primary);
     }
+    .topic-chip.no-match {
+      opacity: 0.4;
+      border-style: dashed;
+    }
+    .topic-chip.no-match::after {
+      content: '';
+    }
+    .topic-chip.has-match::after {
+      content: ' •';
+      color: var(--accent);
+      font-size: 0.6rem;
+    }
+
+    .event-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .action-btn {
+      padding: 0.3rem 0.7rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .action-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+    .action-btn.active { border-color: var(--accent); background: var(--accent-dim); color: var(--text-primary); }
+
+    .saved-panel {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .saved-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+    }
+    .saved-panel-header button {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 1.2rem; cursor: pointer;
+    }
+    .saved-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .saved-item-year { font-size: 0.7rem; color: var(--accent); margin-bottom: 0.3rem; }
+    .saved-item-text { font-size: 0.9rem; color: var(--text-primary); line-height: 1.5; }
+    .saved-item-remove { float: right; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
 
     @media (min-width: 768px) {
       .app-wrapper { max-width: 600px; }
@@ -276,11 +340,23 @@
         <span class="loading-dots"><span></span><span></span><span></span></span>
       </div>
       <div class="event-source" id="eventSource"></div>
+      <div class="event-actions">
+        <button class="action-btn save-btn" id="saveBtn" title="Save this fact">★ Save</button>
+        <button class="action-btn saved-list-btn" id="savedListBtn" title="View saved facts">📋 Saved (<span id="savedCount">0</span>)</button>
+      </div>
     </div>
 
     <div class="topic-row" id="topicRow"></div>
 
     <p class="footer">Clock updates every second &bull; Events refresh each minute</p>
+  </div>
+
+  <div class="saved-panel" id="savedPanel" hidden>
+    <div class="saved-panel-header">
+      <span>★ Saved Facts</span>
+      <button id="closeSavedPanel">✕</button>
+    </div>
+    <div class="saved-list" id="savedList"></div>
   </div>
 
   <script>
@@ -296,6 +372,9 @@
 
     let lastYear = null;
     let cachedEvent = null;
+    let currentEventText = null;
+    let currentSource = null;
+    let allLabels = [];
 
     const TOPICS = [
       { emoji: '🌍', label: 'All' },
@@ -367,6 +446,8 @@
     function showEvent(lines, source, sourceUrl) {
       elEvent.classList.remove('visible');
       elEvent.textContent = lines;
+      currentEventText = lines;
+      currentSource = source || null;
       elSource.innerHTML = source
         ? `Source: <a href="${sourceUrl || '#'}" target="_blank" rel="noopener">${source}</a>`
         : '';
@@ -403,6 +484,9 @@ SELECT ?event ?eventLabel WHERE {
         .filter(v => v && !v.startsWith('Q'));
       if (labels.length === 0) throw new Error('No results');
 
+      // Store full label list for topic availability classification
+      allLabels = labels;
+
       // Apply topic keyword filter client-side
       const keywords = TOPIC_KEYWORDS[activeTopic];
       let filtered = labels;
@@ -426,21 +510,6 @@ SELECT ?event ?eventLabel WHERE {
       };
     }
 
-    async function fetchWikipedia(year) {
-      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${year}`;
-      const resp = await fetch(wikiUrl);
-      if (!resp.ok) throw new Error(`Wikipedia ${resp.status}`);
-      const data = await resp.json();
-      if (!data.extract) throw new Error('No extract');
-      // First 2 sentences
-      const sentences = data.extract.match(/[^.!?]+[.!?]+/g) || [data.extract];
-      return {
-        text: sentences.slice(0, 2).join(' ').trim(),
-        source: 'Wikipedia',
-        url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${year}`
-      };
-    }
-
     async function fetchEvent(year) {
       if (year > 2025) {
         showEvent(
@@ -456,17 +525,11 @@ SELECT ?event ?eventLabel WHERE {
         const result = await fetchWikidata(year);
         cachedEvent = result;
         showEvent(result.text, result.source, result.url);
+        renderTopicChips(classifyTopics(allLabels));
         return;
       } catch (_) { /* fall through */ }
 
-      try {
-        const result = await fetchWikipedia(year);
-        cachedEvent = result;
-        showEvent(result.text, result.source, result.url);
-        return;
-      } catch (_) { /* fall through */ }
-
-      showError(year);
+      showEvent(`No specific records found for year ${year}`, null, null);
     }
 
     function tick() {
@@ -499,30 +562,116 @@ SELECT ?event ?eventLabel WHERE {
         applyYearStyle(year);
         pulseYear();
         cachedEvent = null;
+        allLabels = [];
+        renderTopicChips(); // reset to neutral while loading
         fetchEvent(year);
       }
     }
 
-    function renderTopicChips() {
+    function classifyTopics(labels) {
+      const matched = new Set(['All']); // All is always available
+      const lowerLabels = labels.map(l => l.toLowerCase());
+      for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
+        const hasMatch = lowerLabels.some(label =>
+          keywords.some(kw => label.includes(kw))
+        );
+        if (hasMatch) matched.add(topic);
+      }
+      return matched;
+    }
+
+    function renderTopicChips(availableTopics = null) {
       const row = document.getElementById('topicRow');
       row.innerHTML = '';
       TOPICS.forEach(({ emoji, label }) => {
         const chip = document.createElement('button');
         chip.className = 'topic-chip' + (label === activeTopic ? ' active' : '');
+        if (availableTopics) {
+          chip.classList.add(availableTopics.has(label) ? 'has-match' : 'no-match');
+        }
         chip.textContent = `${emoji} ${label}`;
         chip.addEventListener('click', () => {
           if (activeTopic === label) return;
           activeTopic = label;
           localStorage.setItem('clockapp-topic', label);
-          renderTopicChips();
+          renderTopicChips(availableTopics);
           if (lastYear !== null) fetchEvent(lastYear);
         });
         row.appendChild(chip);
       });
     }
 
+    // ── Saved facts ──────────────────────────────────────────────────────────
+    function loadSaved() {
+      try { return JSON.parse(localStorage.getItem('clockapp-saved') || '[]'); }
+      catch { return []; }
+    }
+    function storeSaved(saved) {
+      localStorage.setItem('clockapp-saved', JSON.stringify(saved));
+    }
+    function saveCurrentFact(year, text, source) {
+      if (!text) return;
+      const saved = loadSaved();
+      const key = `${year}::${text}`;
+      if (saved.find(s => s.key === key)) return;
+      saved.unshift({ key, year, text, source, savedAt: new Date().toISOString() });
+      storeSaved(saved);
+      updateSavedCount();
+      flashSaveBtn();
+    }
+    function removeSaved(key) {
+      const saved = loadSaved().filter(s => s.key !== key);
+      storeSaved(saved);
+      updateSavedCount();
+    }
+    function updateSavedCount() {
+      document.getElementById('savedCount').textContent = loadSaved().length;
+    }
+    function flashSaveBtn() {
+      const btn = document.getElementById('saveBtn');
+      btn.classList.add('active');
+      btn.textContent = '★ Saved!';
+      setTimeout(() => { btn.classList.remove('active'); btn.textContent = '★ Save'; }, 1500);
+    }
+
+    function renderSavedPanel() {
+      const list = document.getElementById('savedList');
+      const saved = loadSaved();
+      if (saved.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">No saved facts yet. Hit ★ Save on any event card!</p>';
+        return;
+      }
+      list.innerHTML = saved.map(s => `
+        <div class="saved-item" data-key="${s.key.replace(/"/g, '&quot;')}">
+          <button class="saved-item-remove" title="Remove">✕</button>
+          <div class="saved-item-year">Year ${s.year}${s.source ? ' · ' + s.source : ''}</div>
+          <div class="saved-item-text">${s.text}</div>
+        </div>
+      `).join('');
+      list.querySelectorAll('.saved-item-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.closest('.saved-item').dataset.key;
+          removeSaved(key);
+          renderSavedPanel();
+        });
+      });
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      saveCurrentFact(lastYear, currentEventText, currentSource);
+    });
+    document.getElementById('savedListBtn').addEventListener('click', () => {
+      renderSavedPanel();
+      document.getElementById('savedPanel').hidden = false;
+    });
+    document.getElementById('closeSavedPanel').addEventListener('click', () => {
+      document.getElementById('savedPanel').hidden = true;
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Kick off immediately, then every second
     renderTopicChips();
+    updateSavedCount();
     tick();
     setInterval(tick, 1000);
 
