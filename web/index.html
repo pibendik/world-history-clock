@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Year Does It Look Like?</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Year Clock">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text-muted: #8b949e;
+      --text-primary: #e6edf3;
+      --accent: #39d0c8;
+      --accent-dim: #1f6f6b;
+      --year-color: #39d0c8;
+      --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      transition: background 0.6s ease;
+    }
+
+    body.future {
+      --accent: #c678dd;
+      --accent-dim: #5c2d6e;
+      --year-color: #ff79c6;
+      --border: #4a2460;
+      --bg-card: #1a0d24;
+    }
+
+    .app-wrapper {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .app-title {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .clock-block {
+      text-align: center;
+    }
+
+    .time-military {
+      font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: clamp(4rem, 20vw, 7rem);
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+
+    .time-military .seconds {
+      font-size: 0.45em;
+      color: var(--text-muted);
+      vertical-align: middle;
+    }
+
+    .time-12hr {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .year-card {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      text-align: center;
+      box-shadow: var(--card-shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .year-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--accent-dim) 0%, transparent 60%);
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    .year-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .year-number {
+      font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: clamp(2.5rem, 14vw, 4.5rem);
+      font-weight: 800;
+      color: var(--year-color);
+      line-height: 1;
+      transition: color 0.4s ease;
+    }
+
+    .year-number.pulse {
+      animation: yearPulse 0.6s ease-out;
+    }
+
+    @keyframes yearPulse {
+      0%   { transform: scale(1.0); opacity: 1; }
+      30%  { transform: scale(1.08); opacity: 0.7; }
+      100% { transform: scale(1.0); opacity: 1; }
+    }
+
+    .year-era {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      min-height: 1.1em;
+    }
+
+    .event-card {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      box-shadow: var(--card-shadow);
+      min-height: 7rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      position: relative;
+    }
+
+    .event-card.antiquity {
+      border-left-color: #d4a44c;
+      background: linear-gradient(135deg, #1a1408 0%, var(--bg-card) 60%);
+    }
+
+    .event-card-header {
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .event-text {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .event-text.visible { opacity: 1; }
+
+    .event-source {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: auto;
+    }
+
+    .event-source a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .event-source a:hover { text-decoration: underline; }
+
+    .loading-dots {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .loading-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: dotBounce 1.2s ease-in-out infinite;
+    }
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes dotBounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40%            { transform: scale(1.0); opacity: 1;   }
+    }
+
+    .footer {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-align: center;
+      opacity: 0.5;
+    }
+
+    .topic-row {
+      width: 100%;
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 0.25rem;
+    }
+    .topic-chip {
+      flex-shrink: 0;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .topic-chip.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+      color: var(--text-primary);
+    }
+
+    @media (min-width: 768px) {
+      .app-wrapper { max-width: 600px; }
+      .event-text { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+    <p class="app-title">What Year Does It Look Like?</p>
+
+    <div class="clock-block">
+      <div class="time-military" id="timeMilitary">
+        <span id="hhmm">00:00</span><span class="seconds" id="ss">:00</span>
+      </div>
+      <div class="time-12hr" id="time12hr">12:00:00 AM</div>
+    </div>
+
+    <div class="year-card">
+      <div class="year-label">Current Year</div>
+      <div class="year-number" id="yearNumber">0000</div>
+      <div class="year-era" id="yearEra"></div>
+    </div>
+
+    <div class="event-card" id="eventCard">
+      <div class="event-card-header" id="eventHeader">Historical Event</div>
+      <div class="event-text" id="eventText">
+        <span class="loading-dots"><span></span><span></span><span></span></span>
+      </div>
+      <div class="event-source" id="eventSource"></div>
+    </div>
+
+    <div class="topic-row" id="topicRow"></div>
+
+    <p class="footer">Clock updates every second &bull; Events refresh each minute</p>
+  </div>
+
+  <script>
+    const elHHMM     = document.getElementById('hhmm');
+    const elSS       = document.getElementById('ss');
+    const el12hr     = document.getElementById('time12hr');
+    const elYear     = document.getElementById('yearNumber');
+    const elEra      = document.getElementById('yearEra');
+    const elEvent    = document.getElementById('eventText');
+    const elSource   = document.getElementById('eventSource');
+    const elHeader   = document.getElementById('eventHeader');
+    const elCard     = document.getElementById('eventCard');
+
+    let lastYear = null;
+    let cachedEvent = null;
+
+    const TOPICS = [
+      { emoji: '🌍', label: 'All' },
+      { emoji: '⚔️', label: 'History' },
+      { emoji: '🔬', label: 'Science' },
+      { emoji: '🎵', label: 'Music' },
+      { emoji: '🔭', label: 'Astronomy' },
+      { emoji: '🏛️', label: 'Art & Architecture' },
+      { emoji: '📚', label: 'Literature' },
+      { emoji: '🧮', label: 'Math' },
+    ];
+
+    const TOPIC_KEYWORDS = {
+      'History':            ['war', 'battle', 'treaty', 'empire', 'king', 'queen', 'revolution', 'army', 'siege', 'dynasty'],
+      'Science':            ['discovered', 'invented', 'experiment', 'theory', 'element', 'chemistry', 'physics', 'biology', 'laboratory'],
+      'Music':              ['music', 'symphony', 'opera', 'composer', 'song', 'concert', 'orchestra', 'piano', 'violin'],
+      'Astronomy':          ['eclipse', 'comet', 'planet', 'star', 'moon', 'solar', 'lunar', 'asteroid', 'transit', 'supernova'],
+      'Art & Architecture': ['painting', 'sculpture', 'architecture', 'cathedral', 'church', 'built', 'constructed', 'artist'],
+      'Literature':         ['published', 'written', 'novel', 'poem', 'book', 'author', 'play', 'literature'],
+      'Math':               ['theorem', 'proof', 'equation', 'calculus', 'algebra', 'geometry', 'mathematician', 'number'],
+    };
+
+    let activeTopic = localStorage.getItem('clockapp-topic') || 'All';
+
+    function getYearFromTime(hh, mm) {
+      return parseInt(String(hh).padStart(2, '0') + String(mm).padStart(2, '0'));
+    }
+
+    function eraLabel(year) {
+      if (year > 2025)  return 'The Future';
+      if (year === 0)   return 'Year Zero / 1 BC';
+      if (year < 100)   return 'Antiquity';
+      if (year < 500)   return 'Late Antiquity';
+      if (year < 1000)  return 'Early Medieval';
+      if (year < 1500)  return 'Medieval';
+      if (year < 1700)  return 'Early Modern';
+      if (year < 1900)  return 'Modern Era';
+      return 'Contemporary';
+    }
+
+    function applyYearStyle(year) {
+      const isFuture   = year > 2025;
+      const isAntiquity = year < 100;
+      document.body.classList.toggle('future', isFuture);
+      elCard.classList.toggle('antiquity', isAntiquity && !isFuture);
+
+      if (isFuture) {
+        elHeader.textContent = 'THE FUTURE';
+      } else if (isAntiquity) {
+        elHeader.textContent = 'Antiquity Event';
+      } else {
+        elHeader.textContent = 'Historical Event';
+      }
+    }
+
+    function pulseYear() {
+      elYear.classList.remove('pulse');
+      void elYear.offsetWidth; // reflow
+      elYear.classList.add('pulse');
+      elYear.addEventListener('animationend', () => elYear.classList.remove('pulse'), { once: true });
+    }
+
+    function showLoading() {
+      elEvent.classList.remove('visible');
+      elEvent.innerHTML = '<span class="loading-dots"><span></span><span></span><span></span></span>';
+      elSource.innerHTML = '';
+    }
+
+    function showEvent(lines, source, sourceUrl) {
+      elEvent.classList.remove('visible');
+      elEvent.textContent = lines;
+      elSource.innerHTML = source
+        ? `Source: <a href="${sourceUrl || '#'}" target="_blank" rel="noopener">${source}</a>`
+        : '';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => elEvent.classList.add('visible'));
+      });
+    }
+
+    function showError(year) {
+      elEvent.classList.remove('visible');
+      elEvent.textContent = `Exploring year ${year}… (offline)`;
+      elSource.textContent = '';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => elEvent.classList.add('visible'));
+      });
+    }
+
+    async function fetchWikidata(year) {
+      const query = `
+SELECT ?event ?eventLabel WHERE {
+  ?event wdt:P585 ?date.
+  FILTER(YEAR(?date) = ${year})
+  FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }
+  FILTER NOT EXISTS { ?event wdt:P31 wd:Q14204246. }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+} LIMIT 10`;
+
+      const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(query)}`;
+      const resp = await fetch(url, { headers: { Accept: 'application/sparql-results+json' } });
+      if (!resp.ok) throw new Error(`Wikidata ${resp.status}`);
+      const data = await resp.json();
+      const labels = data.results.bindings
+        .map(b => b.eventLabel?.value)
+        .filter(v => v && !v.startsWith('Q'));
+      if (labels.length === 0) throw new Error('No results');
+
+      // Apply topic keyword filter client-side
+      const keywords = TOPIC_KEYWORDS[activeTopic];
+      let filtered = labels;
+      let fallback = false;
+      if (keywords) {
+        filtered = labels.filter(l => keywords.some(kw => l.toLowerCase().includes(kw)));
+        if (filtered.length === 0) {
+          filtered = labels;
+          fallback = true;
+        }
+      }
+
+      // Pick 1-3 random results
+      const shuffled = filtered.sort(() => Math.random() - 0.5);
+      const picked = shuffled.slice(0, Math.min(3, shuffled.length));
+      const text = picked.join(' · ') + (fallback ? ` (no ${activeTopic} events found for this year — showing any)` : '');
+      return {
+        text,
+        source: 'Wikidata',
+        url: `https://www.wikidata.org/wiki/Special:Search?search=${year}`
+      };
+    }
+
+    async function fetchWikipedia(year) {
+      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${year}`;
+      const resp = await fetch(wikiUrl);
+      if (!resp.ok) throw new Error(`Wikipedia ${resp.status}`);
+      const data = await resp.json();
+      if (!data.extract) throw new Error('No extract');
+      // First 2 sentences
+      const sentences = data.extract.match(/[^.!?]+[.!?]+/g) || [data.extract];
+      return {
+        text: sentences.slice(0, 2).join(' ').trim(),
+        source: 'Wikipedia',
+        url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${year}`
+      };
+    }
+
+    async function fetchEvent(year) {
+      if (year > 2025) {
+        showEvent(
+          `Year ${year} hasn't happened yet. Enjoy the present.`,
+          null, null
+        );
+        return;
+      }
+
+      showLoading();
+
+      try {
+        const result = await fetchWikidata(year);
+        cachedEvent = result;
+        showEvent(result.text, result.source, result.url);
+        return;
+      } catch (_) { /* fall through */ }
+
+      try {
+        const result = await fetchWikipedia(year);
+        cachedEvent = result;
+        showEvent(result.text, result.source, result.url);
+        return;
+      } catch (_) { /* fall through */ }
+
+      showError(year);
+    }
+
+    function tick() {
+      const now = new Date();
+      const hh  = now.getHours();
+      const mm  = now.getMinutes();
+      const ss  = now.getSeconds();
+
+      const hhStr = String(hh).padStart(2, '0');
+      const mmStr = String(mm).padStart(2, '0');
+      const ssStr = String(ss).padStart(2, '0');
+
+      elHHMM.textContent = `${hhStr}:${mmStr}`;
+      elSS.textContent   = `:${ssStr}`;
+
+      const hour12  = hh % 12 || 12;
+      const ampm    = hh < 12 ? 'AM' : 'PM';
+      el12hr.textContent = `${String(hour12).padStart(2, '0')}:${mmStr}:${ssStr} ${ampm}`;
+
+      // Update browser tab
+      document.title = `${hhStr}:${mmStr} — What Year Does It Look Like?`;
+
+      const year = getYearFromTime(hh, mm);
+
+      if (year !== lastYear) {
+        lastYear = year;
+
+        elYear.textContent = String(year).padStart(4, '0');
+        elEra.textContent  = eraLabel(year);
+        applyYearStyle(year);
+        pulseYear();
+        cachedEvent = null;
+        fetchEvent(year);
+      }
+    }
+
+    function renderTopicChips() {
+      const row = document.getElementById('topicRow');
+      row.innerHTML = '';
+      TOPICS.forEach(({ emoji, label }) => {
+        const chip = document.createElement('button');
+        chip.className = 'topic-chip' + (label === activeTopic ? ' active' : '');
+        chip.textContent = `${emoji} ${label}`;
+        chip.addEventListener('click', () => {
+          if (activeTopic === label) return;
+          activeTopic = label;
+          localStorage.setItem('clockapp-topic', label);
+          renderTopicChips();
+          if (lastYear !== null) fetchEvent(lastYear);
+        });
+        row.appendChild(chip);
+      });
+    }
+
+    // Kick off immediately, then every second
+    renderTopicChips();
+    tick();
+    setInterval(tick, 1000);
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
