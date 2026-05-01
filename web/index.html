@@ -276,6 +276,8 @@
     }
     .action-btn:hover { border-color: var(--accent); color: var(--text-primary); }
     .action-btn.active { border-color: var(--accent); background: var(--accent-dim); color: var(--text-primary); }
+    .like-btn.reacted  { border-color: #3fb950; color: #3fb950; }
+    .dislike-btn.reacted { border-color: #f85149; color: #f85149; }
 
     .saved-panel {
       position: fixed; inset: 0;
@@ -311,10 +313,93 @@
     .saved-item-text { font-size: 0.9rem; color: var(--text-primary); line-height: 1.5; }
     .saved-item-remove { float: right; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
 
+    .nav-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .nav-btn {
+      padding: 0.3rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nav-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+    .nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .nav-status {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-align: center;
+      flex: 1;
+    }
+
+    .era-badge {
+      font-size: 0.65rem;
+      color: var(--accent);
+      margin-top: 0.4rem;
+      letter-spacing: 0.05em;
+      min-height: 1em;
+      opacity: 0.8;
+    }
+
     @media (min-width: 768px) {
       .app-wrapper { max-width: 600px; }
       .event-text { font-size: 1rem; }
     }
+
+    .add-custom-chip {
+      border-style: dashed;
+      color: var(--accent);
+      border-color: var(--accent-dim);
+    }
+    .add-custom-chip:hover { background: var(--accent-dim); }
+
+    .chip-remove {
+      margin-left: 0.3rem;
+      opacity: 0.6;
+      font-size: 0.65rem;
+    }
+    .chip-remove:hover { opacity: 1; }
+
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .modal-title { font-weight: bold; color: var(--text-primary); }
+    .modal-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      resize: vertical;
+    }
+    .modal-input:focus { outline: none; border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
   </style>
 </head>
 <body>
@@ -332,6 +417,13 @@
       <div class="year-label">Current Year</div>
       <div class="year-number" id="yearNumber">0000</div>
       <div class="year-era" id="yearEra"></div>
+      <div class="era-badge" id="eraBadge"></div>
+    </div>
+
+    <div class="nav-row" id="navRow">
+      <button class="nav-btn" id="prevBtn">‹ Prev</button>
+      <span class="nav-status" id="navStatus"></span>
+      <button class="nav-btn" id="nextBtn">Next ›</button>
     </div>
 
     <div class="event-card" id="eventCard">
@@ -342,13 +434,15 @@
       <div class="event-source" id="eventSource"></div>
       <div class="event-actions">
         <button class="action-btn save-btn" id="saveBtn" title="Save this fact">★ Save</button>
+        <button class="action-btn like-btn" id="likeBtn" title="Like this fact">👍</button>
+        <button class="action-btn dislike-btn" id="dislikeBtn" title="Dislike — don't show again">👎</button>
         <button class="action-btn saved-list-btn" id="savedListBtn" title="View saved facts">📋 Saved (<span id="savedCount">0</span>)</button>
       </div>
     </div>
 
     <div class="topic-row" id="topicRow"></div>
 
-    <p class="footer">Clock updates every second &bull; Events refresh each minute</p>
+    <p class="footer">Clock updates every second &bull; Events refresh each minute &bull; <a href="#" id="eraStatsLink" style="color:var(--accent)">📊 Era stats</a></p>
   </div>
 
   <div class="saved-panel" id="savedPanel" hidden>
@@ -359,7 +453,78 @@
     <div class="saved-list" id="savedList"></div>
   </div>
 
+  <div class="saved-panel era-stats-panel" id="eraStatsPanel" hidden>
+    <div class="saved-panel-header">
+      <span>📊 Era Exposure</span>
+      <button id="closeEraStats">✕</button>
+    </div>
+    <div id="eraStatsList"></div>
+  </div>
+
+  <div class="modal-overlay" id="customTopicModal" hidden>
+    <div class="modal-box">
+      <div class="modal-title">Add Custom Topic</div>
+      <input class="modal-input" id="customTopicName" placeholder="Topic name (e.g. Chess)" maxlength="30" />
+      <textarea class="modal-input" id="customTopicKeywords" placeholder="Keywords, comma-separated (e.g. chess, tournament, grandmaster)" rows="3"></textarea>
+      <div class="modal-actions">
+        <button class="action-btn" id="saveCustomTopic">Add Topic</button>
+        <button class="action-btn" id="cancelCustomTopic">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+
+    const EPOCHS = [{"name":"Bronze Age","start":-3300,"end":-1200,"description":"The Bronze Age marked the widespread use of bronze for tools and weapons, enabling the rise of early civilizations. Major cultures emerged in Mesopotamia, Egypt, the Aegean, and beyond.","category":"general","weight":4},{"name":"Ancient Egypt","start":-3100,"end":-30,"description":"One of the world's earliest and longest-lasting civilizations, ancient Egypt flourished along the Nile for over three millennia. It produced iconic monuments, hieroglyphic writing, and a complex polytheistic religion.","category":"general","weight":6},{"name":"Iron Age","start":-1200,"end":500,"description":"The Iron Age saw iron replace bronze as the dominant material for tools and weapons, transforming agriculture and warfare. It witnessed the rise of many of the great civilizations of antiquity.","category":"general","weight":4},{"name":"Ancient Greece","start":-800,"end":-146,"description":"Ancient Greece was the birthplace of democracy, philosophy, and much of Western cultural tradition. City-states like Athens and Sparta shaped art, science, and political thought for millennia to come.","category":"general","weight":6},{"name":"Classical Antiquity","start":-800,"end":600,"description":"Classical Antiquity spans the great civilizations of Greece and Rome, whose cultural, philosophical, and political legacies defined Western civilization. This era produced foundational works in literature, science, architecture, and governance.","category":"general","weight":7},{"name":"Roman Republic","start":-509,"end":-27,"description":"The Roman Republic developed a sophisticated system of republican governance, law, and military organization that allowed Rome to dominate the Mediterranean world. Its political institutions and legal codes have profoundly influenced modern governance.","category":"political","weight":6},{"name":"Roman Empire","start":-27,"end":476,"description":"At its height the Roman Empire encompassed most of Europe, North Africa, and the Near East, uniting diverse peoples under a single administration. Its engineering, law, language, and culture form the bedrock of Western civilization.","category":"general","weight":8},{"name":"Late Antiquity","start":300,"end":600,"description":"Late Antiquity was a transitional period between the classical world and the medieval era, marked by the Christianization of the Roman Empire and the great migrations of Germanic peoples. It saw the fall of the Western Roman Empire and the emergence of new European kingdoms.","category":"general","weight":4},{"name":"Byzantine Empire","start":330,"end":1453,"description":"The Byzantine Empire was the continuation of the Eastern Roman Empire, preserving Greek and Roman culture, law, and Christianity through the medieval period. Its capital Constantinople was the largest and wealthiest city in Christendom for much of this era.","category":"general","weight":6},{"name":"Early Middle Ages","start":500,"end":1000,"description":"The Early Middle Ages saw Europe reorganize following the collapse of the Western Roman Empire, with feudal kingdoms, the spread of Christianity, and monastic scholarship emerging. Trade declined but new cultural and religious identities took shape.","category":"general","weight":5},{"name":"Medieval music","start":500,"end":1400,"description":"Medieval music encompasses sacred chant, polyphony, and the secular songs of troubadours and trouv\u00e8res. Gregorian chant and the earliest forms of written musical notation emerged during this era.","category":"music","weight":4},{"name":"Islamic Golden Age","start":750,"end":1258,"description":"The Islamic Golden Age was a period of remarkable intellectual and cultural flourishing in the Islamic world, with major advances in mathematics, astronomy, medicine, and philosophy. Scholars preserved and expanded upon Greek knowledge while making original contributions that shaped the Renaissance.","category":"science","weight":7},{"name":"Viking Age","start":793,"end":1066,"description":"The Viking Age was defined by Norse seafarers who explored, traded, and raided across Europe, the North Atlantic, and beyond. Their longships carried them from North America to Constantinople, leaving a lasting cultural and genetic legacy.","category":"general","weight":7},{"name":"High Middle Ages","start":1000,"end":1300,"description":"The High Middle Ages saw population growth, the rise of cities and universities, and the flourishing of Gothic architecture and scholastic philosophy in Europe. Feudal society reached its peak alongside the growth of merchant trade and the emergence of national identities.","category":"general","weight":6},{"name":"Crusades","start":1095,"end":1291,"description":"The Crusades were a series of religious military campaigns launched by Christian Europe to capture the Holy Land from Muslim rule. They reshaped politics, trade, and cultural exchange between East and West.","category":"religious","weight":6},{"name":"Late Middle Ages","start":1300,"end":1500,"description":"The Late Middle Ages were marked by crisis and transformation: the Black Death, the Hundred Years' War, and the Western Schism challenged medieval institutions. Yet this period also laid the groundwork for the Renaissance and the modern era.","category":"general","weight":5},{"name":"Renaissance","start":1300,"end":1600,"description":"The Renaissance was a sweeping cultural and intellectual revival centered on the rediscovery of classical antiquity, producing masterworks of painting, sculpture, architecture, and literature. It transformed European thought, elevating humanism and empirical inquiry.","category":"art","weight":8},{"name":"Renaissance music","start":1400,"end":1600,"description":"Renaissance music was characterized by greater use of polyphony, secular forms like the madrigal, and the beginnings of tonal harmony. Composers such as Palestrina, Josquin des Prez, and Byrd defined the era's rich choral tradition.","category":"music","weight":5},{"name":"Age of Exploration","start":1400,"end":1700,"description":"The Age of Exploration was driven by European navigators seeking new trade routes, leading to the mapping of the globe and the establishment of overseas empires. It transformed global commerce and culture while also initiating devastating colonization of the Americas and Africa.","category":"exploration","weight":7},{"name":"Reformation","start":1517,"end":1648,"description":"The Reformation began with Martin Luther's challenge to Catholic Church authority and splintered Western Christianity into Catholic and Protestant branches. It unleashed a century of religious conflict while also stimulating literacy, vernacular culture, and new ideas about individual conscience.","category":"religious","weight":6},{"name":"Age of Sail","start":1571,"end":1862,"description":"The Age of Sail saw wind-powered wooden warships and merchant vessels dominate global trade and warfare. Naval power determined empire, and the mastery of sail enabled the world's first truly global economy.","category":"exploration","weight":5},{"name":"Scientific Revolution","start":1543,"end":1687,"description":"The Scientific Revolution overturned ancient authorities with empirical observation and mathematical reasoning, producing breakthroughs by Copernicus, Galileo, Kepler, and Newton. It established the foundations of modern science and transformed humanity's understanding of the natural world.","category":"science","weight":8},{"name":"Baroque era","start":1600,"end":1750,"description":"The Baroque era produced some of the most dramatic and emotionally expressive music in the Western canon, from the operas of Monteverdi to the masterworks of Bach and Handel. Characterized by ornate complexity and grandeur, it shaped the foundations of classical harmony and counterpoint.","category":"music","weight":6},{"name":"Age of Enlightenment","start":1685,"end":1815,"description":"The Age of Enlightenment championed reason, individual rights, and skepticism toward traditional authority, inspiring revolutions in America and France. Philosophers like Locke, Voltaire, Rousseau, and Kant reshaped political philosophy, science, and society.","category":"general","weight":8},{"name":"Industrial Revolution","start":1760,"end":1840,"description":"The Industrial Revolution transformed manufacturing from hand production to machine-based factory work, first in Britain then across the world. It unleashed unprecedented economic growth, urbanization, and social upheaval, reshaping nearly every aspect of daily life.","category":"general","weight":8},{"name":"Classical music era","start":1750,"end":1820,"description":"The Classical music era produced balanced, elegant forms in symphony, sonata, and opera, epitomized by Haydn, Mozart, and the early Beethoven. It established the orchestra as the central vehicle of Western art music and developed the formal structures that still define concert music.","category":"music","weight":6},{"name":"Classical period music","start":1750,"end":1820,"description":"The Classical period in music is defined by clarity of form, balanced phrase structure, and the dominance of homophonic texture over Baroque counterpoint. The symphonies, string quartets, and piano sonatas of this era set the standard for Western art music.","category":"music","weight":6},{"name":"Romantic era","start":1820,"end":1900,"description":"The Romantic era in music emphasized personal expression, nationalism, and emotional intensity, expanding the orchestra and developing new forms like the symphonic poem. Composers such as Beethoven, Schubert, Brahms, Wagner, and Tchaikovsky defined its sweeping ambition.","category":"music","weight":7},{"name":"Romantic period music","start":1820,"end":1910,"description":"Romantic period music pushed harmonic language to its limits and elevated the virtuoso performer, producing beloved works by Chopin, Liszt, Brahms, and Mahler. The era saw the birth of national schools and the symphony orchestra in its modern form.","category":"music","weight":7},{"name":"Victorian Era","start":1837,"end":1901,"description":"The Victorian Era under Queen Victoria saw Britain at the height of its imperial power, with rapid industrialization, technological innovation, and strict social mores defining the age. It was a period of great literary and scientific achievement alongside stark social inequality.","category":"general","weight":8},{"name":"Age of Imperialism","start":1800,"end":1914,"description":"The Age of Imperialism saw European powers carve up Africa, Asia, and the Pacific into colonial empires, extracting resources and imposing foreign rule on hundreds of millions of people. Competing imperial ambitions ultimately contributed to the outbreak of the First World War.","category":"political","weight":6},{"name":"Modern classical","start":1890,"end":1970,"description":"Modern classical music broke free of tonal harmony and romantic convention, with Debussy, Schoenberg, Stravinsky, and Bart\u00f3k pioneering new languages from impressionism to atonalism and serialism. It remains one of the most intellectually adventurous periods in music history.","category":"music","weight":5},{"name":"Belle \u00c9poque","start":1880,"end":1914,"description":"The Belle \u00c9poque ('Beautiful Era') was a period of optimism, artistic flourishing, and technological progress in Europe before World War I shattered the peace. Paris was its cultural capital, hosting the Impressionists, Art Nouveau, and the birth of cinema.","category":"art","weight":6},{"name":"World War I era","start":1914,"end":1918,"description":"World War I was the first truly industrialized global conflict, claiming the lives of over 17 million people and redrawing the map of Europe and the Middle East. It ended four empires and unleashed forces of nationalism, revolution, and disillusionment that shaped the entire 20th century.","category":"general","weight":7},{"name":"Jazz Age","start":1920,"end":1940,"description":"The Jazz Age saw African American musical genius transform popular culture, with jazz spreading from New Orleans to cities worldwide and becoming the defining sound of the Roaring Twenties. It was an era of cultural vitality, the Harlem Renaissance, and the first great flowering of recorded music.","category":"music","weight":6},{"name":"Interwar period","start":1918,"end":1939,"description":"The Interwar period was marked by political instability, the Great Depression, the rise of fascism and communism, and rapid cultural change. It was an anxious era poised between the trauma of one world war and the gathering storm of another.","category":"general","weight":6},{"name":"Great Depression","start":1929,"end":1939,"description":"The Great Depression was the most severe global economic downturn of the 20th century, causing mass unemployment, poverty, and political radicalization worldwide. It fundamentally changed the relationship between governments and economies and paved the way for the welfare state.","category":"general","weight":5},{"name":"World War II era","start":1939,"end":1945,"description":"World War II was the deadliest conflict in human history, with over 70 million casualties including the Holocaust's six million Jewish victims. It ended with the dawn of the nuclear age and reshaped the global order around two superpowers, the US and USSR.","category":"general","weight":8},{"name":"Cold War","start":1947,"end":1991,"description":"The Cold War was a decades-long ideological, political, and military standoff between the United States and the Soviet Union that shaped global politics and culture. It produced the nuclear arms race, proxy wars, the space race, and ultimately ended with the dissolution of the USSR.","category":"political","weight":8},{"name":"Rock and Roll era","start":1950,"end":1970,"description":"Rock and Roll emerged from African American rhythm and blues to become the defining sound of youth rebellion worldwide, fueled by Elvis, Chuck Berry, The Beatles, and the Rolling Stones. It transformed popular culture, fashion, and attitudes across the globe.","category":"music","weight":6},{"name":"Space Age","start":1957,"end":9999,"description":"The Space Age began with Sputnik's launch in 1957 and saw humans land on the Moon, deploy space stations, and send probes throughout the solar system. It represents humanity's first steps beyond Earth and continues to define scientific ambition and technological possibility.","category":"science","weight":7},{"name":"Digital Age","start":1970,"end":9999,"description":"The Digital Age has transformed human society through the proliferation of computers, the internet, and mobile technology, connecting billions of people and reshaping every aspect of commerce, communication, and culture. It continues to accelerate with artificial intelligence, cloud computing, and ubiquitous connectivity.","category":"science","weight":8},{"name":"Postwar boom","start":1945,"end":1973,"description":"The Postwar boom was an era of unprecedented economic growth, suburbanization, and consumer culture across the Western world following World War II. Rising living standards, the baby boom, and the expansion of the middle class defined this optimistic period.","category":"general","weight":5},{"name":"Age of Revolution","start":1775,"end":1848,"description":"The Age of Revolution saw political upheaval sweep the Atlantic world, from the American and French Revolutions to the independence movements of Latin America and the liberal revolts of 1848. It permanently transformed ideas about popular sovereignty, citizenship, and human rights.","category":"political","weight":7},{"name":"Gilded Age","start":1870,"end":1900,"description":"The Gilded Age in America was a period of rapid industrialization, massive wealth inequality, and the rise of industrial capitalism dominated by robber barons like Carnegie and Rockefeller. Beneath its glittering surface lay labor exploitation, political corruption, and social upheaval.","category":"general","weight":5},{"name":"Information Age","start":1990,"end":9999,"description":"The Information Age is characterized by the rapid shift from industrial to information-based economies driven by the internet, smartphones, and global digital networks. It has democratized access to knowledge while raising new questions about privacy, misinformation, and economic disruption.","category":"science","weight":7},{"name":"Progressive Era","start":1896,"end":1917,"description":"The Progressive Era in the United States brought widespread social and political reform in response to industrialization, including women's suffrage, labor rights, antitrust legislation, and urban sanitation. It marked the emergence of the modern regulatory state.","category":"political","weight":4},{"name":"Atomic Age","start":1945,"end":1991,"description":"The Atomic Age began with the use of nuclear weapons in 1945 and was defined by the existential threat of nuclear war and the promise\u2014and peril\u2014of nuclear power. It shaped international relations, civil defense culture, and environmental awareness throughout the Cold War.","category":"science","weight":6},{"name":"Pop Art era","start":1955,"end":1975,"description":"The Pop Art era challenged fine art conventions by embracing imagery from mass culture, advertising, and consumer goods, with artists like Warhol, Lichtenstein, and Hockney leading the movement. It blurred the line between high and low culture and remains one of the most recognizable art movements of the 20th century.","category":"art","weight":4},{"name":"Ancient Near East","start":-3500,"end":-500,"description":"The Ancient Near East was the cradle of civilization, where Sumerians, Akkadians, Babylonians, and Assyrians built the world's first cities, writing systems, and legal codes. From the Tigris\u2013Euphrates valley came agriculture, the wheel, and the foundations of Western religion and law.","category":"general","weight":6},{"name":"Ming Dynasty","start":1368,"end":1644,"description":"The Ming Dynasty was one of the most stable and prosperous periods in Chinese history, producing iconic blue-and-white porcelain, constructing the Great Wall in its familiar form, and sponsoring Zheng He's great maritime expeditions. Its arts, philosophy, and administrative culture profoundly shaped East Asia.","category":"general","weight":5}];
+
+    function getErasForYear(year) {
+      return EPOCHS
+        .filter(e => year >= e.start && year <= e.end)
+        .sort((a, b) => b.weight - a.weight);
+    }
+
+    function formatEraDisplay(year) {
+      const eras = getErasForYear(year);
+      if (!eras.length) return '';
+      return eras.slice(0, 2).map(e => e.name).join(' · ');
+    }
+
+    function getEraFallbackText(year) {
+      const eras = getErasForYear(year);
+      if (!eras.length) return `No specific records found for year ${year}`;
+      const top = eras[0];
+      return top.description + ` (Year ${year} falls within: ${eras.slice(0,2).map(e=>e.name).join(', ')})`;
+    }
+
+    // ── Era exposure tracker ──────────────────────────────────────────────────
+    function loadEraExposure() {
+      try { return JSON.parse(localStorage.getItem('clockapp-era-exposure') || '{}'); }
+      catch { return {}; }
+    }
+    function saveEraExposure(exp) {
+      localStorage.setItem('clockapp-era-exposure', JSON.stringify(exp));
+    }
+    function incrementEraExposure(eraName) {
+      const exp = loadEraExposure();
+      exp[eraName] = (exp[eraName] || 0) + 1;
+      saveEraExposure(exp);
+    }
+    function getEraExposureScore(era) {
+      // Lower score = more underrepresented = higher priority to show
+      const exp = loadEraExposure();
+      const count = exp[era.name] || 0;
+      // Normalize by weight: divide count by weight so high-weight eras need more shows to be "satisfied"
+      return count / era.weight;
+    }
+    function pickBestEra(year) {
+      const eras = getErasForYear(year);
+      if (!eras.length) return null;
+      // Sort by exposure score ascending (most underrepresented first)
+      const sorted = [...eras].sort((a, b) => getEraExposureScore(a) - getEraExposureScore(b));
+      return sorted[0];
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const elHHMM     = document.getElementById('hhmm');
     const elSS       = document.getElementById('ss');
     const el12hr     = document.getElementById('time12hr');
@@ -371,10 +536,80 @@
     const elCard     = document.getElementById('eventCard');
 
     let lastYear = null;
-    let cachedEvent = null;
+    let viewingYear = null; // null = live mode, number = viewing historical year
     let currentEventText = null;
     let currentSource = null;
     let allLabels = [];
+
+    class YearCache {
+      constructor() {
+        this._cache = new Map(); // year -> { events: [], index: 0, source: '' }
+        this._topicIndex = new Map(); // `${year}:${topic}` -> index
+      }
+
+      store(year, events, source) {
+        if (!this._cache.has(year)) {
+          this._cache.set(year, { events, source, index: 0 });
+        }
+        // Don't overwrite existing cache (preserve cycling position)
+      }
+
+      getNext(year) {
+        const entry = this._cache.get(year);
+        if (!entry || entry.events.length === 0) return null;
+        const event = entry.events[entry.index % entry.events.length];
+        entry.index++;
+        return { event, source: entry.source, total: entry.events.length, shown: entry.index };
+      }
+
+      // Cycles through events matching topic keywords; falls back to all events if none match.
+      getNextForTopic(year, topic, keywords) {
+        const entry = this._cache.get(year);
+        if (!entry || entry.events.length === 0) return null;
+        const filtered = keywords
+          ? entry.events.filter(e => keywords.some(kw => e.toLowerCase().includes(kw)))
+          : entry.events;
+        const pool = filtered.length > 0 ? filtered : entry.events;
+        const isFallback = filtered.length === 0 && !!keywords;
+        const key = `${year}:${topic}`;
+        const idx = (this._topicIndex.get(key) || 0) % pool.length;
+        const event = pool[idx];
+        this._topicIndex.set(key, idx + 1);
+        return { event, source: entry.source, total: pool.length, shown: idx + 1, fallback: isFallback };
+      }
+
+      has(year) { return this._cache.has(year) && this._cache.get(year).events.length > 0; }
+    }
+
+    const yearCache = new YearCache();
+
+    class EventBuffer {
+      constructor() {
+        this._store = new Map(); // year -> { text, source, url, fetching, error }
+      }
+      set(year, data) { this._store.set(year, { ...data, fetching: false, error: false }); }
+      setFetching(year) { this._store.set(year, { fetching: true, error: false }); }
+      get(year) { return this._store.get(year) || null; }
+      has(year) {
+        const e = this._store.get(year);
+        return e && !e.fetching;
+      }
+      prefetch(currentYear, fetchFn) {
+        const targets = [currentYear - 2, currentYear - 1, currentYear + 1, currentYear + 2]
+          .filter(y => y >= 0 && y <= 2359);
+        for (const y of targets) {
+          if (!this._store.has(y)) {
+            this.setFetching(y);
+            fetchFn(y).then(result => {
+              if (result) this.set(y, result);
+              else this._store.delete(y);
+            }).catch(() => this._store.delete(y));
+          }
+        }
+      }
+    }
+
+    const eventBuffer = new EventBuffer();
 
     const TOPICS = [
       { emoji: '🌍', label: 'All' },
@@ -399,20 +634,34 @@
 
     let activeTopic = localStorage.getItem('clockapp-topic') || 'All';
 
+    function loadCustomTopics() {
+      try { return JSON.parse(localStorage.getItem('clockapp-custom-topics') || '[]'); }
+      catch { return []; }
+    }
+    function saveCustomTopics(topics) {
+      localStorage.setItem('clockapp-custom-topics', JSON.stringify(topics));
+    }
+    function getActiveKeywords() {
+      if (activeTopic === 'All') return null;
+      if (TOPIC_KEYWORDS[activeTopic]) return TOPIC_KEYWORDS[activeTopic];
+      const custom = loadCustomTopics().find(t => t.label === activeTopic);
+      return custom ? custom.keywords : null;
+    }
+
     function getYearFromTime(hh, mm) {
       return parseInt(String(hh).padStart(2, '0') + String(mm).padStart(2, '0'));
     }
 
     function eraLabel(year) {
-      if (year > 2025)  return 'The Future';
-      if (year === 0)   return 'Year Zero / 1 BC';
-      if (year < 100)   return 'Antiquity';
-      if (year < 500)   return 'Late Antiquity';
-      if (year < 1000)  return 'Early Medieval';
-      if (year < 1500)  return 'Medieval';
-      if (year < 1700)  return 'Early Modern';
-      if (year < 1900)  return 'Modern Era';
-      return 'Contemporary';
+      if (year > 2025) return 'The Future';
+      const epochStr = formatEraDisplay(year);
+      if (epochStr) return epochStr;
+      // fallbacks for edge cases
+      if (year === 0)  return 'Year Zero / 1 BC';
+      if (year < 0)    return 'BC';
+      if (year < 500)  return 'Late Antiquity';
+      if (year < 1000) return 'Early Medieval';
+      return 'Historical';
     }
 
     function applyYearStyle(year) {
@@ -443,17 +692,20 @@
       elSource.innerHTML = '';
     }
 
-    function showEvent(lines, source, sourceUrl) {
+    function showEvent(lines, source, sourceUrl, counter = '') {
       elEvent.classList.remove('visible');
       elEvent.textContent = lines;
       currentEventText = lines;
       currentSource = source || null;
-      elSource.innerHTML = source
+      const srcHtml = source
         ? `Source: <a href="${sourceUrl || '#'}" target="_blank" rel="noopener">${source}</a>`
         : '';
+      const counterHtml = counter ? ` <span style="opacity:0.5;font-size:0.85em">(${counter})</span>` : '';
+      elSource.innerHTML = srcHtml + counterHtml;
       requestAnimationFrame(() => {
         requestAnimationFrame(() => elEvent.classList.add('visible'));
       });
+      updateReactionButtons(lastYear, lines);
     }
 
     function showError(year) {
@@ -466,70 +718,101 @@
     }
 
     async function fetchWikidata(year) {
-      const query = `
-SELECT ?event ?eventLabel WHERE {
+      const runQuery = async (sparql) => {
+        const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
+        const resp = await fetch(url, { headers: { Accept: 'application/sparql-results+json' } });
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        return data.results.bindings
+          .map(b => b.eventLabel?.value)
+          .filter(v => v && !v.startsWith('Q'));
+      };
+
+      const q1 = `SELECT DISTINCT ?eventLabel WHERE {
   ?event wdt:P585 ?date.
   FILTER(YEAR(?date) = ${year})
   FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }
   FILTER NOT EXISTS { ?event wdt:P31 wd:Q14204246. }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+} LIMIT 15`;
+
+      const q2 = `SELECT DISTINCT ?eventLabel WHERE {
+  ?event wdt:P571 ?date.
+  FILTER(YEAR(?date) = ${year})
+  FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
 } LIMIT 10`;
 
-      const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(query)}`;
-      const resp = await fetch(url, { headers: { Accept: 'application/sparql-results+json' } });
-      if (!resp.ok) throw new Error(`Wikidata ${resp.status}`);
-      const data = await resp.json();
-      const labels = data.results.bindings
-        .map(b => b.eventLabel?.value)
-        .filter(v => v && !v.startsWith('Q'));
-      if (labels.length === 0) throw new Error('No results');
-
-      // Store full label list for topic availability classification
-      allLabels = labels;
-
-      // Apply topic keyword filter client-side
-      const keywords = TOPIC_KEYWORDS[activeTopic];
-      let filtered = labels;
-      let fallback = false;
-      if (keywords) {
-        filtered = labels.filter(l => keywords.some(kw => l.toLowerCase().includes(kw)));
-        if (filtered.length === 0) {
-          filtered = labels;
-          fallback = true;
-        }
+      const [labels1, labels2] = await Promise.all([runQuery(q1), runQuery(q2)]);
+      const seen = new Set();
+      const combined = [];
+      for (const label of [...labels1, ...labels2]) {
+        if (!seen.has(label)) { seen.add(label); combined.push(label); }
       }
+      if (combined.length === 0) throw new Error('No results');
+      yearCache.store(year, combined, 'Wikidata');
+      return combined;
+    }
 
-      // Pick 1-3 random results
-      const shuffled = filtered.sort(() => Math.random() - 0.5);
-      const picked = shuffled.slice(0, Math.min(3, shuffled.length));
-      const text = picked.join(' · ') + (fallback ? ` (no ${activeTopic} events found for this year — showing any)` : '');
-      return {
-        text,
-        source: 'Wikidata',
-        url: `https://www.wikidata.org/wiki/Special:Search?search=${year}`
-      };
+    // Pure async function — fetches event data for a year without touching the DOM.
+    // Uses yearCache for raw labels, applies topic/dislike filters, returns {text, source, url}.
+    async function fetchEventData(year) {
+      if (year > 2025) {
+        const futureEra = formatEraDisplay(year);
+        return {
+          text: futureEra
+            ? `Year ${year} hasn't happened yet. Era context: ${futureEra}`
+            : `Year ${year} hasn't happened yet.`,
+          source: null, url: null
+        };
+      }
+      try {
+        if (!yearCache.has(year)) {
+          const labels = await fetchWikidata(year);
+          allLabels = labels;
+        } else if (allLabels.length === 0) {
+          allLabels = yearCache._cache.get(year)?.events || [];
+        }
+        if (yearCache.has(year)) {
+          const keywords = getActiveKeywords();
+          const wikiUrl = `https://www.wikidata.org/wiki/Special:Search?search=${year}`;
+          const total = yearCache._cache.get(year)?.events.length || 1;
+          for (let attempt = 0; attempt < total; attempt++) {
+            const next = yearCache.getNextForTopic(year, activeTopic, keywords);
+            if (!next) break;
+            if (!isDisliked(year, next.event)) {
+              const { event, fallback } = next;
+              const text = event + (fallback ? ` (no ${activeTopic} events found for this year — showing any)` : '');
+              return { text, source: 'Wikidata', url: wikiUrl };
+            }
+          }
+        }
+      } catch (_) {}
+      return { text: getEraFallbackText(year), source: null, url: null };
     }
 
     async function fetchEvent(year) {
-      if (year > 2025) {
-        showEvent(
-          `Year ${year} hasn't happened yet. Enjoy the present.`,
-          null, null
-        );
+      if (eventBuffer.has(year)) {
+        const cached = eventBuffer.get(year);
+        showEvent(cached.text, cached.source, cached.url);
+        if (yearCache.has(year)) {
+          allLabels = yearCache._cache.get(year)?.events || [];
+          renderTopicChips(classifyTopics(allLabels));
+        }
+        eventBuffer.prefetch(year, fetchEventData);
         return;
       }
 
       showLoading();
-
-      try {
-        const result = await fetchWikidata(year);
-        cachedEvent = result;
+      const result = await fetchEventData(year);
+      if (result) {
+        eventBuffer.set(year, result);
         showEvent(result.text, result.source, result.url);
         renderTopicChips(classifyTopics(allLabels));
-        return;
-      } catch (_) { /* fall through */ }
-
-      showEvent(`No specific records found for year ${year}`, null, null);
+      } else {
+        showEvent(getEraFallbackText(year), null, null);
+      }
+      eventBuffer.prefetch(year, fetchEventData);
     }
 
     function tick() {
@@ -561,10 +844,19 @@ SELECT ?event ?eventLabel WHERE {
         elEra.textContent  = eraLabel(year);
         applyYearStyle(year);
         pulseYear();
-        cachedEvent = null;
         allLabels = [];
         renderTopicChips(); // reset to neutral while loading
-        fetchEvent(year);
+        if (viewingYear === null) { // only update display if in live mode
+          fetchEvent(year);
+        }
+        updateNavStatus();
+
+        const bestEra = pickBestEra(year);
+        const eraBadgeEl = document.getElementById('eraBadge');
+        if (eraBadgeEl && bestEra) {
+          eraBadgeEl.textContent = bestEra.name;
+          incrementEraExposure(bestEra.name);
+        }
       }
     }
 
@@ -576,6 +868,9 @@ SELECT ?event ?eventLabel WHERE {
           keywords.some(kw => label.includes(kw))
         );
         if (hasMatch) matched.add(topic);
+      }
+      for (const ct of loadCustomTopics()) {
+        if (lowerLabels.some(l => ct.keywords.some(kw => l.includes(kw)))) matched.add(ct.label);
       }
       return matched;
     }
@@ -594,12 +889,86 @@ SELECT ?event ?eventLabel WHERE {
           if (activeTopic === label) return;
           activeTopic = label;
           localStorage.setItem('clockapp-topic', label);
+          eventBuffer._store.clear(); // topic change invalidates buffer
           renderTopicChips(availableTopics);
           if (lastYear !== null) fetchEvent(lastYear);
         });
         row.appendChild(chip);
       });
+
+      const customTopics = loadCustomTopics();
+      for (const ct of customTopics) {
+        const chip = document.createElement('button');
+        chip.className = 'topic-chip' + (activeTopic === ct.label ? ' active' : '');
+        if (availableTopics) {
+          chip.classList.add(availableTopics.has(ct.label) ? 'has-match' : 'no-match');
+        }
+        chip.innerHTML = `🏷️ ${ct.label} <span class="chip-remove" data-name="${ct.label}">✕</span>`;
+        chip.addEventListener('click', (e) => {
+          if (e.target.classList.contains('chip-remove')) {
+            const remaining = loadCustomTopics().filter(t => t.label !== ct.label);
+            saveCustomTopics(remaining);
+            if (activeTopic === ct.label) {
+              activeTopic = 'All';
+              localStorage.setItem('clockapp-topic', 'All');
+            }
+            renderTopicChips(availableTopics);
+            if (lastYear !== null) fetchEvent(lastYear);
+            return;
+          }
+          activeTopic = ct.label;
+          localStorage.setItem('clockapp-topic', ct.label);
+          eventBuffer._store.clear();
+          renderTopicChips(availableTopics);
+          if (lastYear !== null) fetchEvent(lastYear);
+        });
+        row.appendChild(chip);
+      }
+
+      const addChip = document.createElement('button');
+      addChip.className = 'topic-chip add-custom-chip';
+      addChip.id = 'addCustomChip';
+      addChip.textContent = '+ Custom';
+      addChip.addEventListener('click', () => {
+        document.getElementById('customTopicName').value = '';
+        document.getElementById('customTopicKeywords').value = '';
+        document.getElementById('customTopicModal').hidden = false;
+      });
+      row.appendChild(addChip);
     }
+
+    // ── Reactions ─────────────────────────────────────────────────────────────
+    function loadReactions() {
+      try { return JSON.parse(localStorage.getItem('clockapp-reactions') || '{}'); }
+      catch { return {}; }
+    }
+    function storeReactions(r) {
+      localStorage.setItem('clockapp-reactions', JSON.stringify(r));
+    }
+    function getReactionKey(year, text) {
+      return `${year}::${text}`;
+    }
+    function recordReaction(year, text, source, reaction) {
+      const r = loadReactions();
+      const key = getReactionKey(year, text);
+      r[key] = { year, text, source, reaction, timestamp: new Date().toISOString() };
+      storeReactions(r);
+      updateReactionButtons(year, text);
+    }
+    function getReaction(year, text) {
+      const r = loadReactions();
+      const entry = r[getReactionKey(year, text)];
+      return entry ? entry.reaction : null;
+    }
+    function isDisliked(year, text) {
+      return getReaction(year, text) === 'dislike';
+    }
+    function updateReactionButtons(year, text) {
+      const reaction = getReaction(year, text);
+      document.getElementById('likeBtn').classList.toggle('reacted', reaction === 'like');
+      document.getElementById('dislikeBtn').classList.toggle('reacted', reaction === 'dislike');
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // ── Saved facts ──────────────────────────────────────────────────────────
     function loadSaved() {
@@ -641,13 +1010,17 @@ SELECT ?event ?eventLabel WHERE {
         list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">No saved facts yet. Hit ★ Save on any event card!</p>';
         return;
       }
-      list.innerHTML = saved.map(s => `
+      list.innerHTML = saved.map(s => {
+        const reaction = getReaction(s.year, s.text);
+        const reactionBadge = reaction === 'like' ? ' 👍' : reaction === 'dislike' ? ' 👎' : '';
+        return `
         <div class="saved-item" data-key="${s.key.replace(/"/g, '&quot;')}">
           <button class="saved-item-remove" title="Remove">✕</button>
-          <div class="saved-item-year">Year ${s.year}${s.source ? ' · ' + s.source : ''}</div>
+          <div class="saved-item-year">Year ${s.year}${s.source ? ' · ' + s.source : ''}${reactionBadge}</div>
           <div class="saved-item-text">${s.text}</div>
         </div>
-      `).join('');
+      `;
+      }).join('');
       list.querySelectorAll('.saved-item-remove').forEach(btn => {
         btn.addEventListener('click', () => {
           const key = btn.closest('.saved-item').dataset.key;
@@ -660,6 +1033,16 @@ SELECT ?event ?eventLabel WHERE {
     document.getElementById('saveBtn').addEventListener('click', () => {
       saveCurrentFact(lastYear, currentEventText, currentSource);
     });
+    document.getElementById('likeBtn').addEventListener('click', () => {
+      if (currentEventText) recordReaction(lastYear, currentEventText, currentSource, 'like');
+    });
+    document.getElementById('dislikeBtn').addEventListener('click', () => {
+      if (currentEventText) {
+        recordReaction(lastYear, currentEventText, currentSource, 'dislike');
+        eventBuffer._store.delete(lastYear); // remove stale cached entry
+        fetchEvent(lastYear);
+      }
+    });
     document.getElementById('savedListBtn').addEventListener('click', () => {
       renderSavedPanel();
       document.getElementById('savedPanel').hidden = false;
@@ -667,11 +1050,112 @@ SELECT ?event ?eventLabel WHERE {
     document.getElementById('closeSavedPanel').addEventListener('click', () => {
       document.getElementById('savedPanel').hidden = true;
     });
+
+    // ── Era stats panel ───────────────────────────────────────────────────────
+    function renderEraStats() {
+      const exp = loadEraExposure();
+      const list = document.getElementById('eraStatsList');
+      const scored = EPOCHS.map(era => ({
+        name: era.name,
+        weight: era.weight,
+        count: exp[era.name] || 0,
+        score: (exp[era.name] || 0) / era.weight,
+      }));
+      scored.sort((a, b) => a.score - b.score);
+      const top10 = scored.slice(0, 10);
+      if (top10.every(e => e.count === 0)) {
+        list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">No era exposure data yet — watch the clock to build your stats!</p>';
+        return;
+      }
+      list.innerHTML = top10.map(e => `
+        <div class="saved-item">
+          <div class="saved-item-year">${e.name}</div>
+          <div class="saved-item-text" style="font-size:0.8rem;color:var(--text-muted)">
+            Shown: ${e.count} &bull; Weight: ${e.weight} &bull; Score: ${e.score.toFixed(2)}
+          </div>
+        </div>
+      `).join('');
+    }
+    document.getElementById('eraStatsLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      renderEraStats();
+      document.getElementById('eraStatsPanel').hidden = false;
+    });
+    document.getElementById('closeEraStats').addEventListener('click', () => {
+      document.getElementById('eraStatsPanel').hidden = true;
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ── Custom topic modal ────────────────────────────────────────────────────
+    document.getElementById('cancelCustomTopic').addEventListener('click', () => {
+      document.getElementById('customTopicModal').hidden = true;
+    });
+
+    document.getElementById('saveCustomTopic').addEventListener('click', () => {
+      const name = document.getElementById('customTopicName').value.trim();
+      const kwText = document.getElementById('customTopicKeywords').value.trim();
+      if (!name || !kwText) return;
+      const keywords = kwText.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+      if (!keywords.length) return;
+      const topics = loadCustomTopics();
+      const idx = topics.findIndex(t => t.label === name);
+      if (idx >= 0) topics[idx] = { label: name, keywords };
+      else topics.push({ label: name, keywords });
+      saveCustomTopics(topics);
+      document.getElementById('customTopicModal').hidden = true;
+      activeTopic = name;
+      localStorage.setItem('clockapp-topic', name);
+      eventBuffer._store.clear();
+      renderTopicChips();
+      if (lastYear !== null) fetchEvent(lastYear);
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ── Navigation ────────────────────────────────────────────────────────────
+    function getDisplayYear() {
+      return viewingYear !== null ? viewingYear : lastYear;
+    }
+
+    function navigate(delta) {
+      const base = viewingYear !== null ? viewingYear : lastYear;
+      const next = Math.max(0, Math.min(2359, base + delta));
+      viewingYear = next;
+      updateNavStatus();
+      fetchEvent(next);
+    }
+
+    function returnToLive() {
+      viewingYear = null;
+      updateNavStatus();
+      if (lastYear !== null) fetchEvent(lastYear);
+    }
+
+    function updateNavStatus() {
+      const el = document.getElementById('navStatus');
+      if (!el) return;
+      if (viewingYear !== null) {
+        el.innerHTML = `Viewing ${viewingYear} &bull; <a href="#" id="liveLink" style="color:var(--accent)">← Live</a>`;
+        document.getElementById('prevBtn').disabled = viewingYear <= 0;
+        document.getElementById('nextBtn').disabled = viewingYear >= 2359;
+        setTimeout(() => {
+          const ll = document.getElementById('liveLink');
+          if (ll) ll.addEventListener('click', e => { e.preventDefault(); returnToLive(); });
+        }, 0);
+      } else {
+        el.textContent = 'Live';
+        document.getElementById('prevBtn').disabled = !lastYear || lastYear <= 0;
+        document.getElementById('nextBtn').disabled = !lastYear || lastYear >= 2359;
+      }
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
+    document.getElementById('nextBtn').addEventListener('click', () => navigate(+1));
     // ─────────────────────────────────────────────────────────────────────────
 
     // Kick off immediately, then every second
     renderTopicChips();
     updateSavedCount();
+    updateNavStatus();
     tick();
     setInterval(tick, 1000);
 

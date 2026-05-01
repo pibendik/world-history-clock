@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """What Year Does It Look Like? — polished Rich version."""
 
-import random
 import sys
 import threading
 import time
@@ -18,15 +17,26 @@ from rich.text import Text
 
 WIKIDATA_HEADERS = {"User-Agent": "ClockApp/0.1 (educational project)"}
 
-SPARQL_TEMPLATE = """
-SELECT ?event ?eventLabel WHERE {{
+SPARQL_P585 = """
+SELECT DISTINCT ?eventLabel WHERE {{
   ?event wdt:P585 ?date.
   FILTER(YEAR(?date) = {year})
   FILTER NOT EXISTS {{ ?event wdt:P31 wd:Q13406463. }}
   FILTER NOT EXISTS {{ ?event wdt:P31 wd:Q14204246. }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}} LIMIT 15
+"""
+
+SPARQL_P571 = """
+SELECT DISTINCT ?eventLabel WHERE {{
+  ?event wdt:P571 ?date.
+  FILTER(YEAR(?date) = {year})
+  FILTER NOT EXISTS {{ ?event wdt:P31 wd:Q13406463. }}
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
 }} LIMIT 10
 """
+
+_year_cache: dict[int, dict] = {}
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -38,42 +48,54 @@ def derive_year(hh: int, mm: int) -> int:
 
 
 def fetch_wikidata(year: int) -> list[str]:
-    try:
-        query = SPARQL_TEMPLATE.format(year=year).strip()
-        url = (
-            "https://query.wikidata.org/sparql"
-            f"?format=json&query={urllib.parse.quote(query)}"
-        )
-        resp = requests.get(url, headers=WIKIDATA_HEADERS, timeout=8)
-        if not resp.ok:
+    """Fetch all event labels for the year from Wikidata (P585 + P571), deduplicated."""
+    def run_query(template: str) -> list[str]:
+        try:
+            query = template.format(year=year).strip()
+            url = (
+                "https://query.wikidata.org/sparql"
+                f"?format=json&query={urllib.parse.quote(query)}"
+            )
+            resp = requests.get(url, headers=WIKIDATA_HEADERS, timeout=8)
+            if not resp.ok:
+                return []
+            bindings = resp.json().get("results", {}).get("bindings", [])
+            return [
+                b["eventLabel"]["value"]
+                for b in bindings
+                if "eventLabel" in b
+                and not b["eventLabel"]["value"].startswith("Q")
+                and len(b["eventLabel"]["value"]) > 10
+            ]
+        except (requests.RequestException, ValueError, KeyError):
             return []
-        bindings = resp.json().get("results", {}).get("bindings", [])
-        labels = [
-            b["eventLabel"]["value"]
-            for b in bindings
-            if "eventLabel" in b
-            and not b["eventLabel"]["value"].startswith("Q")
-            and len(b["eventLabel"]["value"]) > 10
-        ]
-        random.shuffle(labels)
-        return labels[:3]
-    except (requests.RequestException, ValueError, KeyError):
-        return []
+
+    labels1 = run_query(SPARQL_P585)
+    labels2 = run_query(SPARQL_P571)
+    seen: set[str] = set()
+    combined: list[str] = []
+    for label in labels1 + labels2:
+        if label not in seen:
+            seen.add(label)
+            combined.append(label)
+    return combined
 
 
-def fetch_wikipedia(year: int) -> list[str]:
-    try:
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{year}"
-        resp = requests.get(url, headers=WIKIDATA_HEADERS, timeout=8)
-        if not resp.ok:
-            return []
-        extract = resp.json().get("extract", "").strip()
-        if extract and len(extract) > 20:
-            sentences = extract.split(". ")
-            return [". ".join(sentences[:2]) + ("." if len(sentences) > 1 else "")]
-        return []
-    except (requests.RequestException, ValueError, KeyError):
-        return []
+def get_next_cached_event(year: int) -> tuple[str | None, int, int]:
+    """Return (event, total, shown) for the year, cycling through the full cache."""
+    if year not in _year_cache:
+        labels = fetch_wikidata(year)
+        if not labels:
+            return None, 0, 0
+        _year_cache[year] = {"events": labels, "index": 0, "source": "Wikidata"}
+    entry = _year_cache[year]
+    if not entry["events"]:
+        return None, 0, 0
+    total = len(entry["events"])
+    idx = entry["index"] % total
+    event = entry["events"][idx]
+    entry["index"] += 1
+    return event, total, idx + 1
 
 
 def fetch_numbersapi(year: int) -> list[str]:
@@ -90,18 +112,15 @@ def fetch_numbersapi(year: int) -> list[str]:
         return []
 
 
-def fetch_events(year: int) -> tuple[list[str], str | None]:
-    """Try each source in order; return (events, source_name)."""
-    events = fetch_wikidata(year)
-    if events:
-        return events, "Wikidata"
-    events = fetch_wikipedia(year)
-    if events:
-        return events, "Wikipedia"
+def fetch_events(year: int) -> tuple[list[str], str | None, int, int]:
+    """Try each source in order; return (events, source_name, total, shown)."""
+    event, total, shown = get_next_cached_event(year)
+    if event:
+        return [event], "Wikidata", total, shown
     events = fetch_numbersapi(year)
     if events:
-        return events, "Numbers API"
-    return [], None
+        return events, "Numbers API", len(events), 1
+    return [], None, 0, 0
 
 
 # ── Styling helpers ───────────────────────────────────────────────────────────
@@ -174,6 +193,8 @@ def build_events(
     events: list[str],
     source: str | None,
     fetching: bool,
+    total: int = 0,
+    shown: int = 0,
 ) -> Panel:
     theme = year_theme(year)
     is_future = year > 2025
@@ -191,7 +212,7 @@ def build_events(
         return Panel(content, title=panel_title, border_style=theme["border"], box=box.ROUNDED, padding=(0, 2))
 
     if not events:
-        content = Text("(No data found for this year)", style="dim red")
+        content = Text(f"(No specific records found for year {year} — try a nearby minute)", style="dim yellow")
         return Panel(content, title=panel_title, border_style=theme["border"], box=box.ROUNDED, padding=(0, 2))
 
     content = Text()
@@ -205,6 +226,8 @@ def build_events(
     footer = Text()
     if source:
         footer.append(f"[via {source}]", style="dim")
+    if total > 1:
+        footer.append(f"  event {shown} of {total}", style="dim")
 
     return Panel(
         content,
@@ -237,6 +260,8 @@ class ClockState:
         self.last_year = -1
         self.events: list[str] = []
         self.source: str | None = None
+        self.total: int = 0
+        self.shown: int = 0
         self.fetching = False
         self._lock = threading.Lock()
 
@@ -250,17 +275,19 @@ class ClockState:
             self.last_year = year  # claim the year to prevent duplicate triggers
 
         def _fetch():
-            events, source = fetch_events(year)
+            events, source, total, shown = fetch_events(year)
             with self._lock:
                 self.events = events
                 self.source = source
+                self.total = total
+                self.shown = shown
                 self.fetching = False
 
         threading.Thread(target=_fetch, daemon=True).start()
 
-    def snapshot(self) -> tuple[list[str], str | None, bool]:
+    def snapshot(self) -> tuple[list[str], str | None, bool, int, int]:
         with self._lock:
-            return list(self.events), self.source, self.fetching
+            return list(self.events), self.source, self.fetching, self.total, self.shown
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -278,12 +305,12 @@ def main():
             if state.needs_refresh(year):
                 state.start_fetch(year)
 
-            events, source, fetching = state.snapshot()
+            events, source, fetching, total, shown = state.snapshot()
 
             layout["header"].update(build_header())
             layout["left"].update(build_clock(now))
             layout["right"].update(build_year(year))
-            layout["footer"].update(build_events(year, events, source, fetching))
+            layout["footer"].update(build_events(year, events, source, fetching, total, shown))
 
             time.sleep(1)
 

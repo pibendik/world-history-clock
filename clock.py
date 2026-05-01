@@ -5,7 +5,6 @@ import json
 import os
 import sys
 import time
-import random
 import urllib.parse
 import requests
 from datetime import datetime
@@ -23,15 +22,26 @@ MAGENTA = "\033[35m"
 
 WIKIDATA_HEADERS = {"User-Agent": "ClockApp/0.1 (educational project)"}
 
-SPARQL_TEMPLATE = """
-SELECT ?event ?eventLabel WHERE {{
+SPARQL_P585 = """
+SELECT DISTINCT ?eventLabel WHERE {{
   ?event wdt:P585 ?date.
   FILTER(YEAR(?date) = {year})
   FILTER NOT EXISTS {{ ?event wdt:P31 wd:Q13406463. }}
   FILTER NOT EXISTS {{ ?event wdt:P31 wd:Q14204246. }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}} LIMIT 15
+"""
+
+SPARQL_P571 = """
+SELECT DISTINCT ?eventLabel WHERE {{
+  ?event wdt:P571 ?date.
+  FILTER(YEAR(?date) = {year})
+  FILTER NOT EXISTS {{ ?event wdt:P31 wd:Q13406463. }}
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
 }} LIMIT 10
 """
+
+_year_cache: dict[int, dict] = {}
 
 
 def clear():
@@ -42,28 +52,51 @@ def derive_year(hh: int, mm: int) -> int:
     return int(f"{hh:02d}{mm:02d}")
 
 
-def fetch_wikidata(year: int) -> str | None:
-    """Primary: Wikidata SPARQL — returns a random event label for the year."""
-    try:
-        query = SPARQL_TEMPLATE.format(year=year).strip()
-        url = (
-            "https://query.wikidata.org/sparql"
-            f"?format=json&query={urllib.parse.quote(query)}"
-        )
-        resp = requests.get(url, headers=WIKIDATA_HEADERS, timeout=8)
-        if not resp.ok:
+def fetch_wikidata(year: int) -> list[str]:
+    """Fetch all event labels for the year from Wikidata (P585 + P571), deduplicated."""
+    def run_query(template: str) -> list[str]:
+        try:
+            query = template.format(year=year).strip()
+            url = (
+                "https://query.wikidata.org/sparql"
+                f"?format=json&query={urllib.parse.quote(query)}"
+            )
+            resp = requests.get(url, headers=WIKIDATA_HEADERS, timeout=8)
+            if not resp.ok:
+                return []
+            bindings = resp.json().get("results", {}).get("bindings", [])
+            return [
+                b["eventLabel"]["value"]
+                for b in bindings
+                if "eventLabel" in b and not b["eventLabel"]["value"].startswith("Q")
+            ]
+        except (requests.RequestException, ValueError, KeyError):
+            return []
+
+    labels1 = run_query(SPARQL_P585)
+    labels2 = run_query(SPARQL_P571)
+    seen: set[str] = set()
+    combined: list[str] = []
+    for label in labels1 + labels2:
+        if label not in seen:
+            seen.add(label)
+            combined.append(label)
+    return combined
+
+
+def get_next_event(year: int) -> str | None:
+    """Return the next cached event for the year, fetching all events if not yet cached."""
+    if year not in _year_cache:
+        labels = fetch_wikidata(year)
+        if not labels:
             return None
-        bindings = resp.json().get("results", {}).get("bindings", [])
-        labels = [
-            b["eventLabel"]["value"]
-            for b in bindings
-            if "eventLabel" in b and not b["eventLabel"]["value"].startswith("Q")
-        ]
-        if labels:
-            return random.choice(labels)
+        _year_cache[year] = {"events": labels, "index": 0, "source": "Wikidata"}
+    entry = _year_cache[year]
+    if not entry["events"]:
         return None
-    except (requests.RequestException, ValueError, KeyError):
-        return None
+    event = entry["events"][entry["index"] % len(entry["events"])]
+    entry["index"] += 1
+    return event
 
 
 def fetch_numbersapi(year: int) -> str | None:
@@ -83,7 +116,7 @@ def fetch_numbersapi(year: int) -> str | None:
 
 def fetch_fact(year: int) -> tuple[str | None, bool, str | None]:
     """Try each source in order. Returns (fact_text, network_ok, source_name)."""
-    fact = fetch_wikidata(year)
+    fact = get_next_event(year)
     if fact:
         return fact, True, "Wikidata"
     fact = fetch_numbersapi(year)
