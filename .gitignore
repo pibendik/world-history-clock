@@ -7,9 +7,11 @@ __pycache__/
 dist/
 build/
 
-# Secrets & credentials
+# Secrets & credentials (.env.example is intentionally tracked)
 .env
-.env.*
+.env.local
+.env.production
+.env.*.local
 
 # Databases
 *.db
