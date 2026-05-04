@@ -12,6 +12,8 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* Ensure the HTML `hidden` attribute always wins over any display: flex/block rules */
+    [hidden] { display: none !important; }
 
     :root {
       --bg: #0d1117;
