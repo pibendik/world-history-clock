@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -41,6 +42,22 @@ SELECT DISTINCT ?eventLabel WHERE {{
 }} LIMIT 10
 """
 
+_BORING_PATTERNS = [
+    re.compile(r'.+ at the \d{4} (Summer|Winter) Olympics?$', re.I),
+    re.compile(r'.+ at the \d{4} (Summer|Winter) Paralympic Games?$', re.I),
+    re.compile(r'.+ at the \d{4} (Summer|Winter) Youth Olympics?$', re.I),
+    re.compile(r'.+ at the \d{4} Commonwealth Games?$', re.I),
+    re.compile(r'.+ at the \d{4} (FIFA|UEFA|FIBA|IAAF|UCI).*$', re.I),
+    re.compile(r'\d{4}[-–]\d{2,4} .*(season|league|championship)$', re.I),
+    re.compile(r'^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$', re.I),
+    re.compile(r'^\d{4} in ', re.I),
+]
+
+
+def _is_boring_label(label: str) -> bool:
+    return any(p.search(label) for p in _BORING_PATTERNS)
+
+
 _year_cache: dict[int, dict] = {}
 
 
@@ -69,6 +86,7 @@ def fetch_wikidata(year: int) -> list[str]:
                 b["eventLabel"]["value"]
                 for b in bindings
                 if "eventLabel" in b and not b["eventLabel"]["value"].startswith("Q")
+                and not _is_boring_label(b["eventLabel"]["value"])
             ]
         except (requests.RequestException, ValueError, KeyError):
             return []
@@ -128,7 +146,7 @@ def fetch_fact(year: int) -> tuple[str | None, bool, str | None]:
 def year_label(year: int) -> str:
     if year == 0:
         return f"{BOLD}Year 0 / Antiquity{RESET}"
-    if year > 2025:
+    if year > datetime.date.today().year:
         return f"{BOLD}{MAGENTA}Year {year} — THE FUTURE{RESET}"
     era = "AD" if year > 0 else "BC"
     return f"{BOLD}Year {year} {era}{RESET}"

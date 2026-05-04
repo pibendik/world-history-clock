@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fleet-yearclock
+resources:
+  - ../../base
+  - ingress.yaml
+images:
+  - name: ghcr.io/OWNER/yearclock-api
+    # Pin to exact semver tag for production — never use mutable tags like "latest" in pkub
+    newTag: v0.1.0

@@ -1,0 +1,35 @@
+# .dockerignore — exclude files from the Docker build context
+# Build context is the clockapp/ directory
+
+# Development artifacts
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Data & local state
+*.db
+*.sqlite
+*.sqlite3
+.clockapp/
+
+# Dev/test only
+feedback/
+k8s/
+_archived/
+flutter_app/
+
+# Credentials
+.env
+.env.*
+
+# Logs
+*.log
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db

@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: fleet-yearclock-ing
+  namespace: fleet-yearclock
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`yearclock.pkub.nilu.no`)
+      kind: Rule
+      services:
+        - name: fleet-yearclock-svc-web
+          port: 80
+  tls:
+    certResolver: default

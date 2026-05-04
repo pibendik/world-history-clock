@@ -400,6 +400,127 @@
     }
     .modal-input:focus { outline: none; border-color: var(--accent); }
     .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+    /* ── Clickable clock / inline time picker ─────────────────────────────── */
+    #hhmm {
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #hhmm:hover { opacity: 0.75; }
+
+    .time-input-inline {
+      font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: clamp(4rem, 20vw, 7rem);
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      line-height: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid var(--accent);
+      outline: none;
+      width: 6ch;
+      text-align: center;
+      /* hide the native spinner arrows */
+      -webkit-appearance: none;
+    }
+    .time-input-inline::-webkit-calendar-picker-indicator { opacity: 0; }
+
+    /* ── Back to Live button ──────────────────────────────────────────────── */
+    .live-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.55rem 1.1rem;
+      min-height: 44px;
+      border-radius: 999px;
+      border: 1.5px solid #3fb950;
+      background: rgba(63, 185, 80, 0.1);
+      color: #3fb950;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.03em;
+    }
+    .live-btn:hover { background: rgba(63, 185, 80, 0.2); transform: scale(1.03); }
+    .live-dot {
+      animation: livePulse 1.4s ease-in-out infinite;
+      font-size: 0.65em;
+      line-height: 1;
+    }
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ── BROWSING badge ───────────────────────────────────────────────────── */
+    .browsing-badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+    }
+
+    /* ── Timeline slider ──────────────────────────────────────────────────── */
+    .timeline-bar {
+      width: 100%;
+      padding: 0.5rem 0 0.25rem;
+      opacity: 0.45;
+      transition: opacity 0.2s;
+    }
+    .timeline-bar:hover, .timeline-bar:focus-within { opacity: 1; }
+
+    #timelineSlider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+      transition: height 0.15s;
+    }
+    .timeline-bar:hover #timelineSlider,
+    .timeline-bar:focus-within #timelineSlider { height: 6px; }
+
+    #timelineSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(57, 208, 200, 0.5);
+      transition: transform 0.15s;
+    }
+    #timelineSlider::-webkit-slider-thumb:hover { transform: scale(1.3); }
+    #timelineSlider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(57, 208, 200, 0.5);
+    }
+
+    .timeline-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.25rem;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
   </style>
 </head>
 <body>
@@ -408,10 +529,14 @@
 
     <div class="clock-block">
       <div class="time-military" id="timeMilitary">
-        <span id="hhmm">00:00</span><span class="seconds" id="ss">:00</span>
+        <span id="hhmm" title="Click to jump to a time">00:00</span><span class="seconds" id="ss">:00</span>
       </div>
       <div class="time-12hr" id="time12hr">12:00:00 AM</div>
     </div>
+
+    <button id="liveBtn" class="live-btn" aria-label="Return to live clock" hidden>
+      <span class="live-dot">●</span> Back to Live
+    </button>
 
     <div class="year-card">
       <div class="year-label">Current Year</div>
@@ -441,6 +566,18 @@
     </div>
 
     <div class="topic-row" id="topicRow"></div>
+
+    <div class="timeline-bar" id="timelineBar">
+      <input type="range" id="timelineSlider" min="0" max="1439" value="0"
+             aria-label="Navigate through the day">
+      <div class="timeline-labels">
+        <span>00:00</span>
+        <span>06:00</span>
+        <span>12:00</span>
+        <span>18:00</span>
+        <span>23:59</span>
+      </div>
+    </div>
 
     <p class="footer">Clock updates every second &bull; Events refresh each minute &bull; <a href="#" id="eraStatsLink" style="color:var(--accent)">📊 Era stats</a></p>
   </div>
@@ -475,6 +612,16 @@
 
   <script>
 
+    const CURRENT_YEAR = new Date().getFullYear();
+    const API_BASE = 'http://localhost:8421';  // dev default; override via window.YEARCLOCK_API_BASE
+    const API_URL = (window.YEARCLOCK_API_BASE || API_BASE) + '/api/v1';
+
+    function sanitise(str) {
+      const d = document.createElement('div');
+      d.textContent = String(str ?? '');
+      return d.innerHTML;
+    }
+
     const EPOCHS = [{"name":"Bronze Age","start":-3300,"end":-1200,"description":"The Bronze Age marked the widespread use of bronze for tools and weapons, enabling the rise of early civilizations. Major cultures emerged in Mesopotamia, Egypt, the Aegean, and beyond.","category":"general","weight":4},{"name":"Ancient Egypt","start":-3100,"end":-30,"description":"One of the world's earliest and longest-lasting civilizations, ancient Egypt flourished along the Nile for over three millennia. It produced iconic monuments, hieroglyphic writing, and a complex polytheistic religion.","category":"general","weight":6},{"name":"Iron Age","start":-1200,"end":500,"description":"The Iron Age saw iron replace bronze as the dominant material for tools and weapons, transforming agriculture and warfare. It witnessed the rise of many of the great civilizations of antiquity.","category":"general","weight":4},{"name":"Ancient Greece","start":-800,"end":-146,"description":"Ancient Greece was the birthplace of democracy, philosophy, and much of Western cultural tradition. City-states like Athens and Sparta shaped art, science, and political thought for millennia to come.","category":"general","weight":6},{"name":"Classical Antiquity","start":-800,"end":600,"description":"Classical Antiquity spans the great civilizations of Greece and Rome, whose cultural, philosophical, and political legacies defined Western civilization. This era produced foundational works in literature, science, architecture, and governance.","category":"general","weight":7},{"name":"Roman Republic","start":-509,"end":-27,"description":"The Roman Republic developed a sophisticated system of republican governance, law, and military organization that allowed Rome to dominate the Mediterranean world. Its political institutions and legal codes have profoundly influenced modern governance.","category":"political","weight":6},{"name":"Roman Empire","start":-27,"end":476,"description":"At its height the Roman Empire encompassed most of Europe, North Africa, and the Near East, uniting diverse peoples under a single administration. Its engineering, law, language, and culture form the bedrock of Western civilization.","category":"general","weight":8},{"name":"Late Antiquity","start":300,"end":600,"description":"Late Antiquity was a transitional period between the classical world and the medieval era, marked by the Christianization of the Roman Empire and the great migrations of Germanic peoples. It saw the fall of the Western Roman Empire and the emergence of new European kingdoms.","category":"general","weight":4},{"name":"Byzantine Empire","start":330,"end":1453,"description":"The Byzantine Empire was the continuation of the Eastern Roman Empire, preserving Greek and Roman culture, law, and Christianity through the medieval period. Its capital Constantinople was the largest and wealthiest city in Christendom for much of this era.","category":"general","weight":6},{"name":"Early Middle Ages","start":500,"end":1000,"description":"The Early Middle Ages saw Europe reorganize following the collapse of the Western Roman Empire, with feudal kingdoms, the spread of Christianity, and monastic scholarship emerging. Trade declined but new cultural and religious identities took shape.","category":"general","weight":5},{"name":"Medieval music","start":500,"end":1400,"description":"Medieval music encompasses sacred chant, polyphony, and the secular songs of troubadours and trouv\u00e8res. Gregorian chant and the earliest forms of written musical notation emerged during this era.","category":"music","weight":4},{"name":"Islamic Golden Age","start":750,"end":1258,"description":"The Islamic Golden Age was a period of remarkable intellectual and cultural flourishing in the Islamic world, with major advances in mathematics, astronomy, medicine, and philosophy. Scholars preserved and expanded upon Greek knowledge while making original contributions that shaped the Renaissance.","category":"science","weight":7},{"name":"Viking Age","start":793,"end":1066,"description":"The Viking Age was defined by Norse seafarers who explored, traded, and raided across Europe, the North Atlantic, and beyond. Their longships carried them from North America to Constantinople, leaving a lasting cultural and genetic legacy.","category":"general","weight":7},{"name":"High Middle Ages","start":1000,"end":1300,"description":"The High Middle Ages saw population growth, the rise of cities and universities, and the flourishing of Gothic architecture and scholastic philosophy in Europe. Feudal society reached its peak alongside the growth of merchant trade and the emergence of national identities.","category":"general","weight":6},{"name":"Crusades","start":1095,"end":1291,"description":"The Crusades were a series of religious military campaigns launched by Christian Europe to capture the Holy Land from Muslim rule. They reshaped politics, trade, and cultural exchange between East and West.","category":"religious","weight":6},{"name":"Late Middle Ages","start":1300,"end":1500,"description":"The Late Middle Ages were marked by crisis and transformation: the Black Death, the Hundred Years' War, and the Western Schism challenged medieval institutions. Yet this period also laid the groundwork for the Renaissance and the modern era.","category":"general","weight":5},{"name":"Renaissance","start":1300,"end":1600,"description":"The Renaissance was a sweeping cultural and intellectual revival centered on the rediscovery of classical antiquity, producing masterworks of painting, sculpture, architecture, and literature. It transformed European thought, elevating humanism and empirical inquiry.","category":"art","weight":8},{"name":"Renaissance music","start":1400,"end":1600,"description":"Renaissance music was characterized by greater use of polyphony, secular forms like the madrigal, and the beginnings of tonal harmony. Composers such as Palestrina, Josquin des Prez, and Byrd defined the era's rich choral tradition.","category":"music","weight":5},{"name":"Age of Exploration","start":1400,"end":1700,"description":"The Age of Exploration was driven by European navigators seeking new trade routes, leading to the mapping of the globe and the establishment of overseas empires. It transformed global commerce and culture while also initiating devastating colonization of the Americas and Africa.","category":"exploration","weight":7},{"name":"Reformation","start":1517,"end":1648,"description":"The Reformation began with Martin Luther's challenge to Catholic Church authority and splintered Western Christianity into Catholic and Protestant branches. It unleashed a century of religious conflict while also stimulating literacy, vernacular culture, and new ideas about individual conscience.","category":"religious","weight":6},{"name":"Age of Sail","start":1571,"end":1862,"description":"The Age of Sail saw wind-powered wooden warships and merchant vessels dominate global trade and warfare. Naval power determined empire, and the mastery of sail enabled the world's first truly global economy.","category":"exploration","weight":5},{"name":"Scientific Revolution","start":1543,"end":1687,"description":"The Scientific Revolution overturned ancient authorities with empirical observation and mathematical reasoning, producing breakthroughs by Copernicus, Galileo, Kepler, and Newton. It established the foundations of modern science and transformed humanity's understanding of the natural world.","category":"science","weight":8},{"name":"Baroque era","start":1600,"end":1750,"description":"The Baroque era produced some of the most dramatic and emotionally expressive music in the Western canon, from the operas of Monteverdi to the masterworks of Bach and Handel. Characterized by ornate complexity and grandeur, it shaped the foundations of classical harmony and counterpoint.","category":"music","weight":6},{"name":"Age of Enlightenment","start":1685,"end":1815,"description":"The Age of Enlightenment championed reason, individual rights, and skepticism toward traditional authority, inspiring revolutions in America and France. Philosophers like Locke, Voltaire, Rousseau, and Kant reshaped political philosophy, science, and society.","category":"general","weight":8},{"name":"Industrial Revolution","start":1760,"end":1840,"description":"The Industrial Revolution transformed manufacturing from hand production to machine-based factory work, first in Britain then across the world. It unleashed unprecedented economic growth, urbanization, and social upheaval, reshaping nearly every aspect of daily life.","category":"general","weight":8},{"name":"Classical music era","start":1750,"end":1820,"description":"The Classical music era produced balanced, elegant forms in symphony, sonata, and opera, epitomized by Haydn, Mozart, and the early Beethoven. It established the orchestra as the central vehicle of Western art music and developed the formal structures that still define concert music.","category":"music","weight":6},{"name":"Classical period music","start":1750,"end":1820,"description":"The Classical period in music is defined by clarity of form, balanced phrase structure, and the dominance of homophonic texture over Baroque counterpoint. The symphonies, string quartets, and piano sonatas of this era set the standard for Western art music.","category":"music","weight":6},{"name":"Romantic era","start":1820,"end":1900,"description":"The Romantic era in music emphasized personal expression, nationalism, and emotional intensity, expanding the orchestra and developing new forms like the symphonic poem. Composers such as Beethoven, Schubert, Brahms, Wagner, and Tchaikovsky defined its sweeping ambition.","category":"music","weight":7},{"name":"Romantic period music","start":1820,"end":1910,"description":"Romantic period music pushed harmonic language to its limits and elevated the virtuoso performer, producing beloved works by Chopin, Liszt, Brahms, and Mahler. The era saw the birth of national schools and the symphony orchestra in its modern form.","category":"music","weight":7},{"name":"Victorian Era","start":1837,"end":1901,"description":"The Victorian Era under Queen Victoria saw Britain at the height of its imperial power, with rapid industrialization, technological innovation, and strict social mores defining the age. It was a period of great literary and scientific achievement alongside stark social inequality.","category":"general","weight":8},{"name":"Age of Imperialism","start":1800,"end":1914,"description":"The Age of Imperialism saw European powers carve up Africa, Asia, and the Pacific into colonial empires, extracting resources and imposing foreign rule on hundreds of millions of people. Competing imperial ambitions ultimately contributed to the outbreak of the First World War.","category":"political","weight":6},{"name":"Modern classical","start":1890,"end":1970,"description":"Modern classical music broke free of tonal harmony and romantic convention, with Debussy, Schoenberg, Stravinsky, and Bart\u00f3k pioneering new languages from impressionism to atonalism and serialism. It remains one of the most intellectually adventurous periods in music history.","category":"music","weight":5},{"name":"Belle \u00c9poque","start":1880,"end":1914,"description":"The Belle \u00c9poque ('Beautiful Era') was a period of optimism, artistic flourishing, and technological progress in Europe before World War I shattered the peace. Paris was its cultural capital, hosting the Impressionists, Art Nouveau, and the birth of cinema.","category":"art","weight":6},{"name":"World War I era","start":1914,"end":1918,"description":"World War I was the first truly industrialized global conflict, claiming the lives of over 17 million people and redrawing the map of Europe and the Middle East. It ended four empires and unleashed forces of nationalism, revolution, and disillusionment that shaped the entire 20th century.","category":"general","weight":7},{"name":"Jazz Age","start":1920,"end":1940,"description":"The Jazz Age saw African American musical genius transform popular culture, with jazz spreading from New Orleans to cities worldwide and becoming the defining sound of the Roaring Twenties. It was an era of cultural vitality, the Harlem Renaissance, and the first great flowering of recorded music.","category":"music","weight":6},{"name":"Interwar period","start":1918,"end":1939,"description":"The Interwar period was marked by political instability, the Great Depression, the rise of fascism and communism, and rapid cultural change. It was an anxious era poised between the trauma of one world war and the gathering storm of another.","category":"general","weight":6},{"name":"Great Depression","start":1929,"end":1939,"description":"The Great Depression was the most severe global economic downturn of the 20th century, causing mass unemployment, poverty, and political radicalization worldwide. It fundamentally changed the relationship between governments and economies and paved the way for the welfare state.","category":"general","weight":5},{"name":"World War II era","start":1939,"end":1945,"description":"World War II was the deadliest conflict in human history, with over 70 million casualties including the Holocaust's six million Jewish victims. It ended with the dawn of the nuclear age and reshaped the global order around two superpowers, the US and USSR.","category":"general","weight":8},{"name":"Cold War","start":1947,"end":1991,"description":"The Cold War was a decades-long ideological, political, and military standoff between the United States and the Soviet Union that shaped global politics and culture. It produced the nuclear arms race, proxy wars, the space race, and ultimately ended with the dissolution of the USSR.","category":"political","weight":8},{"name":"Rock and Roll era","start":1950,"end":1970,"description":"Rock and Roll emerged from African American rhythm and blues to become the defining sound of youth rebellion worldwide, fueled by Elvis, Chuck Berry, The Beatles, and the Rolling Stones. It transformed popular culture, fashion, and attitudes across the globe.","category":"music","weight":6},{"name":"Space Age","start":1957,"end":9999,"description":"The Space Age began with Sputnik's launch in 1957 and saw humans land on the Moon, deploy space stations, and send probes throughout the solar system. It represents humanity's first steps beyond Earth and continues to define scientific ambition and technological possibility.","category":"science","weight":7},{"name":"Digital Age","start":1970,"end":9999,"description":"The Digital Age has transformed human society through the proliferation of computers, the internet, and mobile technology, connecting billions of people and reshaping every aspect of commerce, communication, and culture. It continues to accelerate with artificial intelligence, cloud computing, and ubiquitous connectivity.","category":"science","weight":8},{"name":"Postwar boom","start":1945,"end":1973,"description":"The Postwar boom was an era of unprecedented economic growth, suburbanization, and consumer culture across the Western world following World War II. Rising living standards, the baby boom, and the expansion of the middle class defined this optimistic period.","category":"general","weight":5},{"name":"Age of Revolution","start":1775,"end":1848,"description":"The Age of Revolution saw political upheaval sweep the Atlantic world, from the American and French Revolutions to the independence movements of Latin America and the liberal revolts of 1848. It permanently transformed ideas about popular sovereignty, citizenship, and human rights.","category":"political","weight":7},{"name":"Gilded Age","start":1870,"end":1900,"description":"The Gilded Age in America was a period of rapid industrialization, massive wealth inequality, and the rise of industrial capitalism dominated by robber barons like Carnegie and Rockefeller. Beneath its glittering surface lay labor exploitation, political corruption, and social upheaval.","category":"general","weight":5},{"name":"Information Age","start":1990,"end":9999,"description":"The Information Age is characterized by the rapid shift from industrial to information-based economies driven by the internet, smartphones, and global digital networks. It has democratized access to knowledge while raising new questions about privacy, misinformation, and economic disruption.","category":"science","weight":7},{"name":"Progressive Era","start":1896,"end":1917,"description":"The Progressive Era in the United States brought widespread social and political reform in response to industrialization, including women's suffrage, labor rights, antitrust legislation, and urban sanitation. It marked the emergence of the modern regulatory state.","category":"political","weight":4},{"name":"Atomic Age","start":1945,"end":1991,"description":"The Atomic Age began with the use of nuclear weapons in 1945 and was defined by the existential threat of nuclear war and the promise\u2014and peril\u2014of nuclear power. It shaped international relations, civil defense culture, and environmental awareness throughout the Cold War.","category":"science","weight":6},{"name":"Pop Art era","start":1955,"end":1975,"description":"The Pop Art era challenged fine art conventions by embracing imagery from mass culture, advertising, and consumer goods, with artists like Warhol, Lichtenstein, and Hockney leading the movement. It blurred the line between high and low culture and remains one of the most recognizable art movements of the 20th century.","category":"art","weight":4},{"name":"Ancient Near East","start":-3500,"end":-500,"description":"The Ancient Near East was the cradle of civilization, where Sumerians, Akkadians, Babylonians, and Assyrians built the world's first cities, writing systems, and legal codes. From the Tigris\u2013Euphrates valley came agriculture, the wheel, and the foundations of Western religion and law.","category":"general","weight":6},{"name":"Ming Dynasty","start":1368,"end":1644,"description":"The Ming Dynasty was one of the most stable and prosperous periods in Chinese history, producing iconic blue-and-white porcelain, constructing the Great Wall in its familiar form, and sponsoring Zheng He's great maritime expeditions. Its arts, philosophy, and administrative culture profoundly shaped East Asia.","category":"general","weight":5}];
 
     function getErasForYear(year) {
@@ -486,7 +633,7 @@
     function formatEraDisplay(year) {
       const eras = getErasForYear(year);
       if (!eras.length) return '';
-      return eras.slice(0, 2).map(e => e.name).join(' · ');
+      return eras.slice(0, 2).map(e => e.name).join(' / ');
     }
 
     function getEraFallbackText(year) {
@@ -653,7 +800,7 @@
     }
 
     function eraLabel(year) {
-      if (year > 2025) return 'The Future';
+      if (year > CURRENT_YEAR) return 'The Future';
       const epochStr = formatEraDisplay(year);
       if (epochStr) return epochStr;
       // fallbacks for edge cases
@@ -665,7 +812,7 @@
     }
 
     function applyYearStyle(year) {
-      const isFuture   = year > 2025;
+      const isFuture   = year > CURRENT_YEAR;
       const isAntiquity = year < 100;
       document.body.classList.toggle('future', isFuture);
       elCard.classList.toggle('antiquity', isAntiquity && !isFuture);
@@ -698,9 +845,9 @@
       currentEventText = lines;
       currentSource = source || null;
       const srcHtml = source
-        ? `Source: <a href="${sourceUrl || '#'}" target="_blank" rel="noopener">${source}</a>`
+        ? `Source: <a href="${sanitise(sourceUrl || '#')}" target="_blank" rel="noopener">${sanitise(source)}</a>`
         : '';
-      const counterHtml = counter ? ` <span style="opacity:0.5;font-size:0.85em">(${counter})</span>` : '';
+      const counterHtml = counter ? ` <span style="opacity:0.5;font-size:0.85em">(${sanitise(counter)})</span>` : '';
       elSource.innerHTML = srcHtml + counterHtml;
       requestAnimationFrame(() => {
         requestAnimationFrame(() => elEvent.classList.add('visible'));
@@ -717,7 +864,19 @@
       });
     }
 
-    async function fetchWikidata(year) {
+    async function fetchWikidataDirect(year) {
+      const BORING_PATTERNS = [
+        /^.+ at the \d{4} (Summer|Winter) Olympics?$/i,
+        /^.+ at the \d{4} (Summer|Winter) Paralympic Games?$/i,
+        /^.+ at the \d{4} (Summer|Winter) Youth Olympics?$/i,
+        /^.+ at the \d{4} Commonwealth Games?$/i,
+        /^.+ at the \d{4} (FIFA|UEFA|FIBA|IAAF|UCI)/i,
+        /^\d{4}[-–]\d{2,4} .*(season|league|championship)$/i,
+        /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/i,
+        /^\d{4} in /i,
+      ];
+      const isBoringLabel = (label) => BORING_PATTERNS.some(p => p.test(label));
+
       const runQuery = async (sparql) => {
         const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
         const resp = await fetch(url, { headers: { Accept: 'application/sparql-results+json' } });
@@ -725,7 +884,7 @@
         const data = await resp.json();
         return data.results.bindings
           .map(b => b.eventLabel?.value)
-          .filter(v => v && !v.startsWith('Q'));
+          .filter(v => v && !v.startsWith('Q') && !isBoringLabel(v));
       };
 
       const q1 = `SELECT DISTINCT ?eventLabel WHERE {
@@ -754,10 +913,28 @@
       return combined;
     }
 
+    // Proxy: tries the FastAPI backend first, falls back to direct Wikidata.
+    async function fetchWikidata(year) {
+      try {
+        const resp = await fetch(`${API_URL}/year/${year}`, { signal: AbortSignal.timeout(8000) });
+        if (resp.ok) {
+          const data = await resp.json();
+          const events = (data.events || []).map(e => e.text || e).filter(Boolean);
+          if (events.length > 0) {
+            yearCache.store(year, events, 'API');
+            return events;
+          }
+        }
+      } catch (_) {
+        // Backend unreachable — fall through to direct Wikidata
+      }
+      return await fetchWikidataDirect(year);
+    }
+
     // Pure async function — fetches event data for a year without touching the DOM.
     // Uses yearCache for raw labels, applies topic/dislike filters, returns {text, source, url}.
     async function fetchEventData(year) {
-      if (year > 2025) {
+      if (year > CURRENT_YEAR) {
         const futureEra = formatEraDisplay(year);
         return {
           text: futureEra
@@ -827,6 +1004,12 @@
 
       elHHMM.textContent = `${hhStr}:${mmStr}`;
       elSS.textContent   = `:${ssStr}`;
+
+      // Keep slider in sync with live clock
+      if (viewingYear === null) {
+        const slider = document.getElementById('timelineSlider');
+        if (slider) slider.value = hh * 60 + mm;
+      }
 
       const hour12  = hh % 12 || 12;
       const ampm    = hh < 12 ? 'AM' : 'PM';
@@ -903,7 +1086,7 @@
         if (availableTopics) {
           chip.classList.add(availableTopics.has(ct.label) ? 'has-match' : 'no-match');
         }
-        chip.innerHTML = `🏷️ ${ct.label} <span class="chip-remove" data-name="${ct.label}">✕</span>`;
+        chip.innerHTML = `🏷️ ${sanitise(ct.label)} <span class="chip-remove" data-name="${sanitise(ct.label)}">✕</span>`;
         chip.addEventListener('click', (e) => {
           if (e.target.classList.contains('chip-remove')) {
             const remaining = loadCustomTopics().filter(t => t.label !== ct.label);
@@ -1016,8 +1199,8 @@
         return `
         <div class="saved-item" data-key="${s.key.replace(/"/g, '&quot;')}">
           <button class="saved-item-remove" title="Remove">✕</button>
-          <div class="saved-item-year">Year ${s.year}${s.source ? ' · ' + s.source : ''}${reactionBadge}</div>
-          <div class="saved-item-text">${s.text}</div>
+          <div class="saved-item-year">Year ${sanitise(s.year)}${s.source ? ' / ' + sanitise(s.source) : ''}${reactionBadge}</div>
+          <div class="saved-item-text">${sanitise(s.text)}</div>
         </div>
       `;
       }).join('');
@@ -1069,9 +1252,9 @@
       }
       list.innerHTML = top10.map(e => `
         <div class="saved-item">
-          <div class="saved-item-year">${e.name}</div>
+          <div class="saved-item-year">${sanitise(e.name)}</div>
           <div class="saved-item-text" style="font-size:0.8rem;color:var(--text-muted)">
-            Shown: ${e.count} &bull; Weight: ${e.weight} &bull; Score: ${e.score.toFixed(2)}
+            Shown: ${sanitise(e.count)} &bull; Weight: ${sanitise(e.weight)} &bull; Score: ${sanitise(e.score.toFixed(2))}
           </div>
         </div>
       `).join('');
@@ -1116,40 +1299,119 @@
       return viewingYear !== null ? viewingYear : lastYear;
     }
 
+    function setViewingYear(year) {
+      viewingYear = year;
+      updateNavStatus();
+      const displayYear = year !== null ? year : lastYear;
+      if (displayYear !== null) fetchEvent(displayYear);
+    }
+
     function navigate(delta) {
       const base = viewingYear !== null ? viewingYear : lastYear;
       const next = Math.max(0, Math.min(2359, base + delta));
-      viewingYear = next;
-      updateNavStatus();
-      fetchEvent(next);
+      setViewingYear(next);
     }
 
     function returnToLive() {
-      viewingYear = null;
-      updateNavStatus();
-      if (lastYear !== null) fetchEvent(lastYear);
+      setViewingYear(null);
     }
 
     function updateNavStatus() {
       const el = document.getElementById('navStatus');
+      const liveBtn = document.getElementById('liveBtn');
       if (!el) return;
       if (viewingYear !== null) {
-        el.innerHTML = `Viewing ${viewingYear} &bull; <a href="#" id="liveLink" style="color:var(--accent)">← Live</a>`;
+        el.innerHTML = `Viewing ${viewingYear}<span class="browsing-badge">BROWSING</span>`;
         document.getElementById('prevBtn').disabled = viewingYear <= 0;
         document.getElementById('nextBtn').disabled = viewingYear >= 2359;
-        setTimeout(() => {
-          const ll = document.getElementById('liveLink');
-          if (ll) ll.addEventListener('click', e => { e.preventDefault(); returnToLive(); });
-        }, 0);
+        if (liveBtn) liveBtn.hidden = false;
       } else {
         el.textContent = 'Live';
         document.getElementById('prevBtn').disabled = !lastYear || lastYear <= 0;
         document.getElementById('nextBtn').disabled = !lastYear || lastYear >= 2359;
+        if (liveBtn) liveBtn.hidden = true;
       }
     }
 
     document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
     document.getElementById('nextBtn').addEventListener('click', () => navigate(+1));
+    document.getElementById('liveBtn').addEventListener('click', () => returnToLive());
+
+    // ── Clickable clock → inline time picker ──────────────────────────────────
+    (function () {
+      const hhmmEl = document.getElementById('hhmm');
+      let pickerOpen = false;
+
+      function openTimePicker() {
+        if (pickerOpen) return;
+        pickerOpen = true;
+
+        const currentText = hhmmEl.textContent; // "HH:MM"
+        const input = document.createElement('input');
+        input.type = 'time';
+        input.id = 'timeInput';
+        input.className = 'time-input-inline';
+        input.value = currentText;
+
+        let committed = false;
+
+        const commit = () => {
+          if (committed) return;
+          committed = true;
+          pickerOpen = false;
+          hhmmEl.parentNode.replaceChild(hhmmEl, input);
+          if (input.value) {
+            const [hh, mm] = input.value.split(':').map(Number);
+            const year = hh * 100 + mm;
+            setViewingYear(year);
+          }
+        };
+
+        const cancel = () => {
+          if (committed) return;
+          committed = true;
+          pickerOpen = false;
+          hhmmEl.parentNode.replaceChild(hhmmEl, input);
+        };
+
+        input.addEventListener('change', commit);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', () => setTimeout(cancel, 150));
+
+        hhmmEl.parentNode.replaceChild(input, hhmmEl);
+        input.focus();
+      }
+
+      hhmmEl.addEventListener('click', openTimePicker);
+    })();
+
+    // ── Keyboard navigation ───────────────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); navigate(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); navigate(+1); }
+      if (e.key === 'Escape' && viewingYear !== null) returnToLive();
+    });
+
+    // ── Timeline slider ───────────────────────────────────────────────────────
+    (function () {
+      const slider = document.getElementById('timelineSlider');
+      let sliderDebounce = null;
+
+      slider.addEventListener('input', () => {
+        const totalMins = parseInt(slider.value, 10);
+        const hh = Math.floor(totalMins / 60);
+        const mm = totalMins % 60;
+        const year = hh * 100 + mm;
+        viewingYear = year;
+        updateNavStatus();
+        clearTimeout(sliderDebounce);
+        sliderDebounce = setTimeout(() => fetchEvent(year), 300);
+      });
+    })();
     // ─────────────────────────────────────────────────────────────────────────
 
     // Kick off immediately, then every second

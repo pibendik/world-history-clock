@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-yearclock-deploy-api
+  labels:
+    app: fleet-yearclock-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleet-yearclock-api
+  template:
+    metadata:
+      labels:
+        app: fleet-yearclock-api
+    spec:
+      containers:
+        - name: api
+          # TODO: replace OWNER with the GitHub username/org that owns the package
+          image: ghcr.io/OWNER/yearclock-api:v0.1.0
+          ports:
+            - containerPort: 8421
+          envFrom:
+            - configMapRef:
+                name: fleet-yearclock-config
+            - secretRef:
+                name: fleet-yearclock-secret
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8421
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8421
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: fleet-yearclock-pvc

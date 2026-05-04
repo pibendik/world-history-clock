@@ -1,0 +1,41 @@
+# Caddyfile — production config for YearClock
+# Caddy automatically fetches and renews HTTPS certificates via Let's Encrypt.
+# Set YEARCLOCK_DOMAIN in your .env before running.
+#
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+{$YEARCLOCK_DOMAIN} {
+
+    # Security headers
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+
+    # Proxy all /api/ requests to the FastAPI backend
+    handle /api/* {
+        reverse_proxy api:8421
+    }
+
+    # Serve PWA static files; fall back to index.html for SPA routing
+    handle {
+        root * /srv/web
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Cache static assets for 1 day
+    @static path *.js *.css *.png *.ico *.json *.webmanifest
+    header @static Cache-Control "public, max-age=86400, immutable"
+
+    # Structured access log
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+        format json
+    }
+}

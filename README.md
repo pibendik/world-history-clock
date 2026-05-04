@@ -38,9 +38,21 @@ pip install requests
 python3 clockapp/clock.py
 ```
 
+### `web/` — Web UI (PWA)
+
+Progressive web app version available via FastAPI service. Installable on Android/iOS via "Add to Home Screen".
+
+### `server/` — FastAPI backend
+
+Core service that provides the year-to-fact mapping and event data via REST API.
+
 ## Requirements
 
 - Python 3.10+
 - `requests` — HTTP calls to Wikidata / Wikipedia / Numbers API
 - `rich` — only for `clock_rich.py`
 - Internet connection
+
+## Archived
+
+The Flutter client has been archived in favour of the PWA. See `_archived/README.md` for details.

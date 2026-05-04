@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-yearclock-deploy-web
+  labels:
+    app: fleet-yearclock-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleet-yearclock-web
+  template:
+    metadata:
+      labels:
+        app: fleet-yearclock-web
+    spec:
+      # TODO: build clockapp/web/Dockerfile and push as ghcr.io/OWNER/yearclock-web:v0.1.0
+      # The initContainer below copies built PWA assets from the API image (which contains
+      # clockapp/web/) into the shared emptyDir volume so nginx can serve them.
+      # Once a dedicated web image is built, replace the initContainer + emptyDir with a
+      # proper image reference (ghcr.io/OWNER/yearclock-web:v0.1.0) and remove the initContainer.
+      initContainers:
+        - name: copy-web-assets
+          # TODO: replace OWNER with the GitHub username/org that owns the package
+          image: ghcr.io/OWNER/yearclock-api:v0.1.0
+          command:
+            - sh
+            - -c
+            - cp -r /app/clockapp/web/. /web-assets/
+          volumeMounts:
+            - name: web-assets
+              mountPath: /web-assets
+      containers:
+        - name: web
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: web-assets
+              mountPath: /usr/share/nginx/html
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: fleet-yearclock-nginx-config
+        - name: web-assets
+          emptyDir: {}

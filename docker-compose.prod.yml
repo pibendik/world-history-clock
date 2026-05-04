@@ -1,0 +1,64 @@
+# docker-compose.prod.yml — production deployment with Caddy + auto-HTTPS
+#
+# Prerequisites:
+#   1. Copy .env.example to .env and set YEARCLOCK_DOMAIN=yourdomain.com
+#   2. Ports 80 and 443 must be open on your server firewall
+#
+# Run from the clockapp/ directory:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml logs -f
+#   docker compose -f docker-compose.prod.yml down
+
+version: "3.9"
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    # Not exposed to host — only reachable internally by Caddy
+    expose:
+      - "8421"
+    volumes:
+      - yearclock-data:/data
+    env_file:
+      - .env
+    environment:
+      YEARCLOCK_DB_PATH: /data/yearclock.db
+      YEARCLOCK_CORS_ORIGINS: '["https://${YEARCLOCK_DOMAIN}"]'
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8421/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web:/srv/web:ro
+      - caddy-data:/data            # TLS certs — must persist across restarts!
+      - caddy-config:/config
+      - caddy-logs:/var/log/caddy
+    env_file:
+      - .env
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  yearclock-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+  caddy-logs:
+    driver: local

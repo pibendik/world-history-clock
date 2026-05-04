@@ -3,10 +3,11 @@
 import json
 import sqlite3
 import time
-from pathlib import Path
 
-_DB_PATH = Path.home() / ".clockapp" / "yearclock.db"
-_CACHE_TTL = 7 * 24 * 3600  # 7 days in seconds
+from clockapp.server.config import settings
+
+_DB_PATH = settings.db_path
+_CACHE_TTL = settings.cache_ttl_days * 24 * 3600
 
 
 def get_db() -> sqlite3.Connection:

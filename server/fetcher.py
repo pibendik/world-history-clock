@@ -1,9 +1,11 @@
 """Wikidata fetching logic, adapted from clock.py."""
 
+import re
 import urllib.parse
 
 import requests
 
+from clockapp.server.config import settings
 from clockapp.server.db import get_cached_events, store_events
 
 SPARQL_P585 = """
@@ -26,13 +28,27 @@ SELECT DISTINCT ?eventLabel WHERE {{
 """
 
 HEADERS = {"User-Agent": "YearClock/1.0 (educational project)"}
-_SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
+
+_BORING_PATTERNS = [
+    re.compile(r'.+ at the \d{4} (Summer|Winter) Olympics?$', re.I),
+    re.compile(r'.+ at the \d{4} (Summer|Winter) Paralympic Games?$', re.I),
+    re.compile(r'.+ at the \d{4} (Summer|Winter) Youth Olympics?$', re.I),
+    re.compile(r'.+ at the \d{4} Commonwealth Games?$', re.I),
+    re.compile(r'.+ at the \d{4} (FIFA|UEFA|FIBA|IAAF|UCI).*$', re.I),
+    re.compile(r'\d{4}[-–]\d{2,4} .*(season|league|championship)$', re.I),
+    re.compile(r'^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$', re.I),
+    re.compile(r'^\d{4} in ', re.I),
+]
+
+
+def _is_boring_label(label: str) -> bool:
+    return any(p.search(label) for p in _BORING_PATTERNS)
 
 
 def _run_query(template: str, year: int) -> list[str]:
     try:
         query = template.format(year=year).strip()
-        url = f"{_SPARQL_ENDPOINT}?format=json&query={urllib.parse.quote(query)}"
+        url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
         resp = requests.get(url, headers=HEADERS, timeout=8)
         if not resp.ok:
             return []
@@ -43,6 +59,7 @@ def _run_query(template: str, year: int) -> list[str]:
             if "eventLabel" in b
             and not b["eventLabel"]["value"].startswith("Q")
             and len(b["eventLabel"]["value"]) >= 15
+            and not _is_boring_label(b["eventLabel"]["value"])
         ]
     except (requests.RequestException, ValueError, KeyError):
         return []

@@ -21,4 +21,4 @@ def format_era_display(year: int) -> str:
     if not eras:
         return ""
     top = eras[:2]
-    return " · ".join(e["name"] for e in top)
+    return " / ".join(e["name"] for e in top)

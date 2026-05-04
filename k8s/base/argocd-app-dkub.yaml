@@ -1,0 +1,22 @@
+# ArgoCD Application manifest for the dkub (development) cluster.
+# This file is for documentation / bootstrapping reference.
+# The actual Application object is typically created via the ArgoCD UI or
+# by an admin applying this manifest in the argocd namespace of dkub.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleet-yearclock
+  namespace: argocd
+spec:
+  project: fleet
+  source:
+    repoURL: https://github.com/OWNER/fleet-experimentation  # TODO: update OWNER
+    targetRevision: main
+    path: clockapp/k8s/overlays/dkub
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleet-yearclock
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
