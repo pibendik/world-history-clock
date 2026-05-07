@@ -105,8 +105,10 @@ if [[ -z "$DOMAIN" ]]; then
         echo "   ssh $SERVER 'cd $REPO_DIR && docker compose -f docker-compose.prod.yml logs --tail=50'"
     fi
 else
-    # || true: curl exits non-zero on network errors; set -e would kill the script without this
-    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/api/v1/year/2000" || true)
+    # Check the PWA landing page (static file — always fast, no Wikidata/cache dependency).
+    # Year endpoints can take 30s after --clear-cache so they're unsuitable for a 10s timeout.
+    # || true: curl exits non-zero on TLS/network errors; set -euo pipefail would kill the script.
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/" || true)
     if [[ "$HTTP_STATUS" == "200" ]]; then
         echo ""
         echo "✅ Deploy successful! App is live at https://$DOMAIN"
