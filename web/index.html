@@ -1074,8 +1074,11 @@
         return;
       }
 
-      showLoading();
+      // Delay the spinner: only show it if data takes > 250ms.
+      // For SQLite-cached years the API responds in < 50ms — spinner never appears.
+      let spinnerTimer = setTimeout(showLoading, 250);
       const result = await fetchEventData(year);
+      clearTimeout(spinnerTimer);
       if (result) {
         eventBuffer.set(year, result);
         showEvent(result.text, result.source, result.url, '', year);
@@ -1131,14 +1134,15 @@
         }
       }
 
-      // At second :50, silently prefetch the NEXT minute's year so the
-      // transition at :00 is instant rather than showing a loading spinner.
-      if (ss === 50 && viewingYear === null) {
+      // At seconds :45–:55, silently prefetch the NEXT minute's year so the
+      // transition at :00 is instant. Use _store.has() not has() so we don't
+      // start a duplicate fetch while one is already in flight.
+      if (ss >= 45 && ss <= 55 && viewingYear === null) {
         const nextTotalMins = hh * 60 + mm + 1;
         const nextHH = Math.floor(nextTotalMins / 60) % 24;
         const nextMM = nextTotalMins % 60;
         const nextYear = getYearFromTime(nextHH, nextMM);
-        if (!eventBuffer.has(nextYear)) {
+        if (!eventBuffer._store.has(nextYear)) {
           eventBuffer.setFetching(nextYear);
           fetchEventData(nextYear)
             .then(result => { if (result) eventBuffer.set(nextYear, result); else eventBuffer._store.delete(nextYear); })
@@ -1525,6 +1529,30 @@
     updateNavStatus();
     tick();
     setInterval(tick, 1000);
+
+    // Silently pre-warm the next 5 years so the first transitions after page
+    // load are instant. Stagger by 300ms each to avoid a burst of requests.
+    (function prewarmNextYears() {
+      const now = new Date();
+      for (let i = 1; i <= 5; i++) {
+        const mins = now.getHours() * 60 + now.getMinutes() + i;
+        const hh = Math.floor(mins / 60) % 24;
+        const mm = mins % 60;
+        const y = getYearFromTime(hh, mm);
+        if (!eventBuffer._store.has(y)) {
+          (function(year, delay) {
+            setTimeout(() => {
+              if (!eventBuffer._store.has(year)) {
+                eventBuffer.setFetching(year);
+                fetchEventData(year)
+                  .then(r => { if (r) eventBuffer.set(year, r); else eventBuffer._store.delete(year); })
+                  .catch(() => eventBuffer._store.delete(year));
+              }
+            }, delay);
+          })(y, i * 300);
+        }
+      }
+    })();
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
