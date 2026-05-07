@@ -1,58 +1,108 @@
-# What Year Does It Look Like?
+# Historieklokka — The History Clock
 
-A terminal clock that maps the current military time (HH:MM) to a year and
-fetches an interesting historical fact about that year from Wikidata/Wikipedia.
+> *What year does it look like right now?*
 
-## Examples
+A progressive web app (PWA) that maps the current military time to a historical year and displays a curated fact from that year. **15:23** shows something from **1523**. **09:07** shows something from **907**.
 
-| Time  | Year |
-|-------|------|
-| 15:50 | 1550 |
-| 09:07 | 907  |
-| 00:00 | 0    |
-| 23:59 | 2359 |
+**Live at [historieklokka.no](https://historieklokka.no)**
 
-## Versions
+---
 
-### `clock_rich.py` — polished (requires `rich`)
+## How It Works
 
-Full-featured version with a live layout, color-coded eras, multiple events
-stacked in a panel, spinner while fetching, and no-flicker updates.
+| Clock time | Mapped year | Example fact |
+|-----------|-------------|--------------|
+| 09:07 | 907 | Edmund I becomes King of England |
+| 15:23 | 1523 | Publication of Luther's *On Temporal Authority* |
+| 19:69 | 1969 | Apollo 11 lands on the Moon |
+| 23:59 | 2359 | Far future — contextual era text shown |
 
-```bash
-pip install -r clockapp/requirements.txt
-python3 clockapp/clock_rich.py
+Each minute, the clock fetches a fact from [Wikidata](https://www.wikidata.org). Facts are cached server-side so subsequent visitors see instant results. An era-context layer adds vivid background sentences ("The Black Death was devastating Europe") for every year on the clock.
+
+---
+
+## Repository Structure
+
+```
+clockapp/
+├── web/                # PWA front-end (single HTML file + service worker)
+│   ├── index.html
+│   └── sw.js
+├── server/             # FastAPI backend
+│   ├── main.py         # API routes
+│   ├── fetcher.py      # Wikidata SPARQL queries + content filtering
+│   ├── warmer.py       # Background cache warmer
+│   ├── scorer.py       # Optional LLM quality scoring (OpenAI)
+│   ├── db.py           # SQLite cache
+│   ├── config.py       # Settings (env vars)
+│   └── Dockerfile
+├── data/
+│   ├── era_context.json  # Vivid context sentences for every clock year
+│   └── epochs.py         # Era lookup helpers
+├── _archived/          # Superseded terminal and Flutter versions
+├── docker-compose.yml          # Local development
+├── docker-compose.prod.yml     # Production (Caddy + auto-HTTPS)
+├── Caddyfile           # Caddy reverse proxy config
+├── deploy.sh           # One-command deploy script
+├── .env.example        # Configuration reference
+└── SERVER-SETUP.md     # Server provisioning guide
 ```
 
-- **Future years** (> 2025): magenta colour scheme, labelled "THE FUTURE"
-- **Antiquity** (< 100 AD): dim yellow, noted "sparse records"
-- Up to **3 events** shown per year (from Wikidata, with Wikipedia / Numbers API fallback)
-- Event data is re-fetched only when the mapped year changes (every minute)
+---
 
-### `clock.py` — simple (only requires `requests`)
+## Running Locally
 
-Minimal ANSI version; no additional dependencies beyond `requests`.
+**Prerequisites:** Docker + Docker Compose
 
 ```bash
-pip install requests
-python3 clockapp/clock.py
+git clone https://github.com/pibendik/world-history-clock.git
+cd world-history-clock
+docker compose up --build
 ```
 
-### `web/` — Web UI (PWA)
+Open [http://localhost:8421](http://localhost:8421) — the clock is live.  
+API docs at [http://localhost:8421/docs](http://localhost:8421/docs).
 
-Progressive web app version available via FastAPI service. Installable on Android/iOS via "Add to Home Screen".
+---
 
-### `server/` — FastAPI backend
+## Deploying to Production
 
-Core service that provides the year-to-fact mapping and event data via REST API.
+See **[SERVER-SETUP.md](SERVER-SETUP.md)** for full provisioning instructions.
 
-## Requirements
+Quick deploy after changes:
 
-- Python 3.10+
-- `requests` — HTTP calls to Wikidata / Wikipedia / Numbers API
-- `rich` — only for `clock_rich.py`
-- Internet connection
+```bash
+./deploy.sh root@YOUR_SERVER_IP
+```
 
-## Archived
+Clear the fact cache on deploy (fetches fresh results with latest filters):
 
-The Flutter client has been archived in favour of the PWA. See `_archived/README.md` for details.
+```bash
+./deploy.sh root@YOUR_SERVER_IP --clear-cache
+```
+
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` on the server and fill in your values.  
+See `.env.example` for all available options, including the optional LLM scorer.
+
+---
+
+## Content Quality
+
+Facts come from Wikidata SPARQL queries with multi-layer filtering:
+
+1. **SPARQL-level exclusions** — asteroids, eclipses, natural numbers, disambiguation pages filtered out before they consume result slots
+2. **Label filtering** — minimum length, must contain spaces, no bare Q-codes, regex patterns for boring entries
+3. **Notability proxy** — post-1850 results require ≥ 20 Wikipedia sitelinks (cross-language presence)
+4. **LLM scoring** *(optional)* — `gpt-4o-mini` re-ranks and filters results; enable with `OPENAI_API_KEY`
+
+---
+
+## Terminal Versions *(archived)*
+
+The original terminal prototypes are kept in `_archived/` for reference.  
+They are not maintained and may be out of date.
+
