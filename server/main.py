@@ -10,7 +10,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from clockapp.data.epochs import format_era_display, get_eras_for_year
+from clockapp.data.epochs import format_era_display, get_context_for_year, get_eras_for_year
 from clockapp.server.db import (
     get_era_exposure,
     get_reactions,
@@ -64,6 +64,7 @@ def _build_year_data(year: int) -> dict:
     events = [] if is_future else get_events_for_year(year)
     eras = get_eras_for_year(year)
     era_display = format_era_display(year)
+    context = get_context_for_year(year)
 
     if eras:
         increment_era_exposure(eras[0]["name"])
@@ -73,6 +74,7 @@ def _build_year_data(year: int) -> dict:
         "events": events,
         "eras": eras,
         "era_display": era_display,
+        "context": context,
         "is_future": is_future,
     }
 

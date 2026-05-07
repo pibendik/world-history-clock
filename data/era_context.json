@@ -1,0 +1,372 @@
+[
+  {
+    "from": -100000,
+    "to": -3200,
+    "text": "Humans were living in hunter-gatherer bands — no writing, no cities, no agriculture. Everything made was made by hand from stone, bone, and wood."
+  },
+  {
+    "from": -3200,
+    "to": -2000,
+    "text": "The first cities and writing systems were emerging in Mesopotamia and Egypt. Humanity was inventing civilisation from scratch."
+  },
+  {
+    "from": -2000,
+    "to": -1200,
+    "text": "The Bronze Age was at its height. Great palace civilisations ruled the Mediterranean, and trade networks stretched from Britain to Babylon."
+  },
+  {
+    "from": -1200,
+    "to": -800,
+    "text": "The Bronze Age had just collapsed in a matter of decades — whole empires vanished, trade networks broke down, and literacy nearly disappeared from the Mediterranean."
+  },
+  {
+    "from": -800,
+    "to": -500,
+    "text": "The Greek city-states were rising. Philosophy was being invented. The Persian Empire was the largest the world had ever seen."
+  },
+  {
+    "from": -500,
+    "to": -323,
+    "text": "The golden age of Athens — Socrates, Plato, the Parthenon. The world's first democracy was a radical experiment on a small peninsula."
+  },
+  {
+    "from": -323,
+    "to": -100,
+    "text": "Alexander the Great had spread Greek culture from Egypt to India. The Hellenistic world was a cosmopolitan melting pot of languages, religions, and ideas."
+  },
+  {
+    "from": -270,
+    "to": -100,
+    "text": "Rome was rising from Italian city-state to Mediterranean empire, fighting Carthage in the Punic Wars for control of the western world."
+  },
+  {
+    "from": -100,
+    "to": 0,
+    "text": "Rome was tearing itself apart in civil wars — Julius Caesar, Augustus, and the end of the Republic. The Mediterranean world was being unified under one ruler."
+  },
+  {
+    "from": 0,
+    "to": 180,
+    "text": "The Roman Empire was near its peak, stretching from Scotland to Mesopotamia. Over a quarter of humanity lived under Roman law. Roads and aqueducts connected the known world."
+  },
+  {
+    "from": 30,
+    "to": 300,
+    "text": "Christianity was spreading quietly through the Roman Empire, moving from a persecuted sect in Judea to a religion with followers from Spain to Persia."
+  },
+  {
+    "from": 180,
+    "to": 350,
+    "text": "The Roman Empire was fracturing — political instability, plague, and pressure from migrations were weakening the structure that had held the Mediterranean world together."
+  },
+  {
+    "from": 350,
+    "to": 476,
+    "text": "The Roman Empire was in its final decades. Germanic peoples were crossing the Rhine and Danube in waves. The world it had built was unravelling."
+  },
+  {
+    "from": 476,
+    "to": 600,
+    "text": "The Roman world had collapsed in the West. Cities were emptying, roads were unmaintained, and literacy was becoming rare. The Dark Ages had begun."
+  },
+  {
+    "from": 570,
+    "to": 750,
+    "text": "Islam had just been founded and was spreading with astonishing speed — within a century of Muhammad's death, Muslim armies reached Spain, Central Asia, and the edge of India."
+  },
+  {
+    "from": 600,
+    "to": 900,
+    "text": "Europe was fragmented into small, constantly warring kingdoms. The Islamic world was the most advanced civilisation on Earth, preserving and expanding the knowledge of antiquity."
+  },
+  {
+    "from": 793,
+    "to": 1050,
+    "text": "The Vikings were raiding and trading from Newfoundland to Constantinople. Their longships could cross oceans or navigate the rivers deep into Russia."
+  },
+  {
+    "from": 800,
+    "to": 900,
+    "text": "Charlemagne had briefly united much of Western Europe — the first time since Rome. His empire was already fracturing among his grandsons after his death."
+  },
+  {
+    "from": 1000,
+    "to": 1095,
+    "text": "Medieval Europe was slowly recovering. The first universities were forming, trade was reviving, and the population was beginning to grow again after centuries of stagnation."
+  },
+  {
+    "from": 1095,
+    "to": 1291,
+    "text": "The Crusades were ongoing — European armies were fighting, trading, and dying in the Holy Land. It was an age of extraordinary violence and cultural contact between Christianity and Islam."
+  },
+  {
+    "from": 1200,
+    "to": 1280,
+    "text": "The Mongol Empire under Genghis Khan and his successors was the largest contiguous land empire in history, reshaping Eurasia from China to Poland in a generation."
+  },
+  {
+    "from": 1280,
+    "to": 1340,
+    "text": "Medieval Europe was at its demographic peak. Cathedrals were soaring above growing cities. No one knew what was coming."
+  },
+  {
+    "from": 1315,
+    "to": 1350,
+    "text": "Famines and extreme weather had been weakening Europe for years. Then the Black Death arrived from the East."
+  },
+  {
+    "from": 1347,
+    "to": 1353,
+    "text": "The Black Death was devastating Europe. One in three people would die — entire villages were wiped out, and the medieval world would never look the same again."
+  },
+  {
+    "from": 1353,
+    "to": 1430,
+    "text": "Europe was slowly recovering from the Black Death. The massive labour shortage gave surviving peasants new leverage — serfdom was weakening, wages were rising."
+  },
+  {
+    "from": 1400,
+    "to": 1450,
+    "text": "The Renaissance was flourishing in Italy. Art, science, and humanism were being rediscovered. Wealthy merchants in Florence were funding a cultural explosion."
+  },
+  {
+    "from": 1440,
+    "to": 1510,
+    "text": "The printing press had just been invented. For the first time, books could be mass-produced. Ideas that once took decades to spread now moved in years."
+  },
+  {
+    "from": 1453,
+    "to": 1550,
+    "text": "Constantinople had fallen to the Ottomans, ending the Byzantine Empire after a thousand years. The Ottoman Empire now dominated the eastern Mediterranean."
+  },
+  {
+    "from": 1492,
+    "to": 1560,
+    "text": "Europe had just 'discovered' the Americas. Millions of indigenous people were dying from diseases they had never encountered. Gold and silver were flowing east."
+  },
+  {
+    "from": 1510,
+    "to": 1580,
+    "text": "The potato, tomato, and maize had arrived in Europe from the Americas — but most Europeans had never tasted them and barely knew they existed."
+  },
+  {
+    "from": 1517,
+    "to": 1600,
+    "text": "The Reformation had shattered Christian unity in Europe. Catholics and Protestants were fighting bitter wars over which version of Christianity was true."
+  },
+  {
+    "from": 1560,
+    "to": 1650,
+    "text": "The potato was beginning to spread through Europe, but remained exotic and distrusted. It would take another century before it became a staple food for ordinary people."
+  },
+  {
+    "from": 1600,
+    "to": 1700,
+    "text": "The Scientific Revolution was underway — Galileo, Kepler, and Newton were rewriting humanity's understanding of the cosmos. The universe was larger and more mechanical than anyone had imagined."
+  },
+  {
+    "from": 1618,
+    "to": 1648,
+    "text": "The Thirty Years' War was devastating Central Europe — up to a third of the population of German-speaking lands would die before the Peace of Westphalia ended it."
+  },
+  {
+    "from": 1648,
+    "to": 1700,
+    "text": "Europe was emerging from a century of religious war, exhausted. Coffee houses were opening in every city, and the Enlightenment was just beginning to stir."
+  },
+  {
+    "from": 1700,
+    "to": 1750,
+    "text": "The Age of Reason was transforming European thought. Coffee houses were the social media of their day — where ideas, newspapers, and revolutions were all born."
+  },
+  {
+    "from": 1750,
+    "to": 1780,
+    "text": "The Enlightenment was at its peak. Voltaire, Rousseau, and Hume were questioning everything — religion, monarchy, and the nature of humanity itself."
+  },
+  {
+    "from": 1760,
+    "to": 1830,
+    "text": "The Industrial Revolution was underway in Britain — steam engines were replacing muscle power for the first time in human history. The world was about to change forever."
+  },
+  {
+    "from": 1776,
+    "to": 1800,
+    "text": "The American Revolution had created a republic based on Enlightenment ideals, and the French Revolution was reshaping Europe in blood and fire. The age of monarchy was ending."
+  },
+  {
+    "from": 1800,
+    "to": 1815,
+    "text": "Napoleon was at the peak of his power. His armies had remade the map of Europe, and his legal codes were reshaping how nations governed themselves."
+  },
+  {
+    "from": 1815,
+    "to": 1848,
+    "text": "After Napoleon's defeat, Europe's old monarchies were trying to restore the old order. Nationalism and liberalism were building underground, waiting to erupt."
+  },
+  {
+    "from": 1830,
+    "to": 1870,
+    "text": "Industrialisation was spreading from Britain to the Continent. Factories and slums were growing side by side. Charles Dickens was describing what he saw."
+  },
+  {
+    "from": 1848,
+    "to": 1870,
+    "text": "The revolutionary year of 1848 had shaken every throne in Europe. The new industrial working class was finding its voice — Karl Marx had just published the Communist Manifesto."
+  },
+  {
+    "from": 1850,
+    "to": 1880,
+    "text": "Railways were shrinking the world. A journey that took weeks now took days. For the first time, ordinary people could travel far from where they were born."
+  },
+  {
+    "from": 1861,
+    "to": 1865,
+    "text": "The American Civil War was being fought over slavery and the future of the United States — the bloodiest war in American history, with over 600,000 dead."
+  },
+  {
+    "from": 1870,
+    "to": 1900,
+    "text": "The Belle Époque — an era of optimism, technological wonder, and imperial expansion. Few suspected the catastrophe that was quietly being prepared."
+  },
+  {
+    "from": 1880,
+    "to": 1910,
+    "text": "Electricity was transforming city life — electric lights, trams, and the first telephones. Rural areas and most of the world saw almost none of it."
+  },
+  {
+    "from": 1900,
+    "to": 1914,
+    "text": "The world was more connected than ever before — and more heavily armed. Europe's great powers were locked in alliances that would drag them all into catastrophe."
+  },
+  {
+    "from": 1914,
+    "to": 1918,
+    "text": "The First World War was raging. An entire generation of young men was being killed in the trenches. It was the bloodiest war in history up to that point."
+  },
+  {
+    "from": 1917,
+    "to": 1922,
+    "text": "The Russian Revolution was reshaping the world. The Tsar had been overthrown, and the Soviet Union was being born from the chaos of civil war."
+  },
+  {
+    "from": 1918,
+    "to": 1929,
+    "text": "The war was over, but Europe was shattered. Empires had collapsed, the map was being redrawn, and the 1920s were roaring with jazz, anxiety, and borrowed money."
+  },
+  {
+    "from": 1929,
+    "to": 1939,
+    "text": "The Great Depression had collapsed the world economy. Millions were unemployed. Extreme politics — fascism and communism — were filling the vacuum left by failed democracy."
+  },
+  {
+    "from": 1933,
+    "to": 1939,
+    "text": "The Nazis were in power in Germany. Across Europe, democracies were falling and dictators rising. Most people still hoped a second world war could be avoided."
+  },
+  {
+    "from": 1939,
+    "to": 1945,
+    "text": "The Second World War was being fought across the globe. The Holocaust was systematically murdering millions. Over 70 million people would die before it ended."
+  },
+  {
+    "from": 1945,
+    "to": 1950,
+    "text": "The war had just ended. Europe lay in ruins. The atomic bomb had changed everything. The world was already dividing into two hostile blocs."
+  },
+  {
+    "from": 1950,
+    "to": 1953,
+    "text": "The Korean War was being fought — the first hot war of the Cold War era, with American and Chinese forces clashing directly on the peninsula."
+  },
+  {
+    "from": 1950,
+    "to": 1965,
+    "text": "Television was spreading into homes across the Western world for the first time — in black and white. It was fundamentally changing how people understood the world."
+  },
+  {
+    "from": 1953,
+    "to": 1970,
+    "text": "The Cold War was at its height. The US and Soviet Union were locked in an arms race and a space race, each genuinely convinced the other might strike first."
+  },
+  {
+    "from": 1960,
+    "to": 1970,
+    "text": "The Space Age had arrived — humans were going to the Moon. At the same time, the Civil Rights movement was reshaping American society, and the old order was being challenged everywhere."
+  },
+  {
+    "from": 1962,
+    "to": 1975,
+    "text": "The Vietnam War was consuming a generation. Protests were erupting across the Western world against the war, against racism, and against the established order."
+  },
+  {
+    "from": 1965,
+    "to": 1975,
+    "text": "Colour television was just beginning to spread into homes. The 1950s were still in living memory. A man had walked on the Moon."
+  },
+  {
+    "from": 1970,
+    "to": 1980,
+    "text": "The optimism of the 1960s had curdled. The oil crisis had ended the long post-war boom. Stagflation, political scandals, and terrorism were defining the decade."
+  },
+  {
+    "from": 1980,
+    "to": 1990,
+    "text": "The personal computer was arriving in homes. Most people had never heard of the internet. The Cold War was unexpectedly — and suddenly — ending."
+  },
+  {
+    "from": 1985,
+    "to": 1991,
+    "text": "The Soviet Union was collapsing from within. Gorbachev's reforms had unleashed forces he could not control. The Berlin Wall would soon fall."
+  },
+  {
+    "from": 1989,
+    "to": 1993,
+    "text": "The Berlin Wall had fallen. The Soviet Union was dissolving. For the first time in 45 years, the Cold War was over — and nobody quite knew what would come next."
+  },
+  {
+    "from": 1993,
+    "to": 2001,
+    "text": "The internet was spreading from universities to homes. A generation was going online for the first time. The world was becoming networked at a speed no one had predicted."
+  },
+  {
+    "from": 1998,
+    "to": 2008,
+    "text": "The World Wide Web was transforming everything. Most businesses had no website a decade earlier. E-mail was normal now. Google existed. The dot-com bubble had burst and rebuilt."
+  },
+  {
+    "from": 2001,
+    "to": 2010,
+    "text": "The September 11 attacks had launched a War on Terror. The world's attention shifted to Afghanistan and Iraq. Security and surveillance expanded everywhere."
+  },
+  {
+    "from": 2004,
+    "to": 2012,
+    "text": "Social media was being born — Facebook, YouTube, Twitter. Most people still used a camera separately from their phone. The smartphone was about to change everything."
+  },
+  {
+    "from": 2008,
+    "to": 2013,
+    "text": "The 2008 financial crisis had shaken the global economy. Banks had collapsed, millions had lost their homes, and governments were imposing austerity on their populations."
+  },
+  {
+    "from": 2012,
+    "to": 2020,
+    "text": "The smartphone had put a supercomputer in everyone's pocket. Social media was reshaping politics, attention, and the very nature of what people agreed was true."
+  },
+  {
+    "from": 2016,
+    "to": 2021,
+    "text": "Populism was rising across the democratic world — Brexit, Trump, and an era of profound political polarisation. Social media was accelerating the breakdown of shared reality."
+  },
+  {
+    "from": 2020,
+    "to": 2022,
+    "text": "The COVID-19 pandemic had shut down the world. Billions were in lockdown. It was the largest disruption to daily life since the Second World War."
+  },
+  {
+    "from": 2022,
+    "to": 2100,
+    "text": "Russia had invaded Ukraine, ending the post-Cold War peace in Europe. AI was beginning to transform work and creativity at a pace that made the future genuinely hard to predict."
+  }
+]

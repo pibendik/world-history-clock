@@ -55,8 +55,20 @@ SELECT DISTINCT ?eventLabel WHERE {{
 """.format(exclusions=_P31_EXCLUSIONS).replace("{{year}}", "{year}")
 
 # Dedicated query for notable humans — births AND deaths in the year.
-# People are almost always interesting; P21 ensures they have a gender
-# statement (a rough proxy for notability/completeness in Wikidata).
+# For recent years (post-1850) add a sitelinks floor to prefer globally
+# notable people over obscure local figures.
+SPARQL_HUMANS_MODERN = """
+SELECT DISTINCT ?eventLabel WHERE {{
+  {{ ?event wdt:P569 ?date. }} UNION {{ ?event wdt:P570 ?date. }}
+  FILTER(YEAR(?date) = {{year}})
+  ?event wdt:P31 wd:Q5.
+  ?event wdt:P21 [].
+  ?event wikibase:sitelinks ?links.
+  FILTER(?links >= 20)
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}} ORDER BY DESC(?links) LIMIT 15
+""".replace("{{year}}", "{year}")
+
 SPARQL_HUMANS = """
 SELECT DISTINCT ?eventLabel WHERE {{
   {{ ?event wdt:P569 ?date. }} UNION {{ ?event wdt:P570 ?date. }}
@@ -156,9 +168,14 @@ def fetch_wikidata_events(year: int) -> list[str]:
       1. P585 (point in time) — actual events, discoveries, battles, etc.
       2. Notable humans (births/deaths) — almost always interesting
       3. P571 (inception) — institutions, buildings, organisations founded
+
+    For years after 1850, the humans query requires >= 20 sitelinks
+    (cross-language Wikipedia presence as a notability proxy) to avoid
+    minor local figures swamping the results for data-rich modern years.
     """
+    humans_template = SPARQL_HUMANS_MODERN if year > 1850 else SPARQL_HUMANS
     labels1 = _run_query(SPARQL_P585, year)
-    labels2 = _run_query(SPARQL_HUMANS, year)
+    labels2 = _run_query(humans_template, year)
     labels3 = _run_query(SPARQL_P571, year)
     seen: set[str] = set()
     combined: list[str] = []

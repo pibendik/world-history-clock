@@ -195,6 +195,17 @@
     }
     .event-source a:hover { text-decoration: underline; }
 
+    .era-context {
+      margin-top: 0.9rem;
+      padding: 0.6rem 0.8rem;
+      border-left: 3px solid var(--accent);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: 1.5;
+      opacity: 0.85;
+    }
+
     .loading-dots {
       display: inline-flex;
       gap: 4px;
@@ -559,6 +570,7 @@
         <span class="loading-dots"><span></span><span></span><span></span></span>
       </div>
       <div class="event-source" id="eventSource"></div>
+      <div class="era-context" id="eraContext" hidden></div>
       <div class="event-actions">
         <button class="action-btn save-btn" id="saveBtn" title="Save this fact">★ Save</button>
         <button class="action-btn like-btn" id="likeBtn" title="Like this fact">👍</button>
@@ -687,6 +699,7 @@
     const elSource   = document.getElementById('eventSource');
     const elHeader   = document.getElementById('eventHeader');
     const elCard     = document.getElementById('eventCard');
+    const elEraCtx   = document.getElementById('eraContext');
 
     let lastYear = null;
     let viewingYear = null; // null = live mode, number = viewing historical year
@@ -698,6 +711,7 @@
       constructor() {
         this._cache = new Map(); // year -> { events: [], index: 0, source: '' }
         this._topicIndex = new Map(); // `${year}:${topic}` -> index
+        this._context = new Map(); // year -> context sentence string
       }
 
       store(year, events, source) {
@@ -706,6 +720,12 @@
         }
         // Don't overwrite existing cache (preserve cycling position)
       }
+
+      storeContext(year, text) {
+        if (text) this._context.set(year, text);
+      }
+
+      getContext(year) { return this._context.get(year) || null; }
 
       getNext(year) {
         const entry = this._cache.get(year);
@@ -843,6 +863,8 @@
       elEvent.classList.remove('visible');
       elEvent.innerHTML = '<span class="loading-dots"><span></span><span></span><span></span></span>';
       elSource.innerHTML = '';
+      elEraCtx.hidden = true;
+      elEraCtx.textContent = '';
     }
 
     function showEvent(lines, source, sourceUrl, counter = '') {
@@ -855,6 +877,17 @@
         : '';
       const counterHtml = counter ? ` <span style="opacity:0.5;font-size:0.85em">(${sanitise(counter)})</span>` : '';
       elSource.innerHTML = srcHtml + counterHtml;
+
+      // Show era context sentence if available for the current year
+      const ctx = yearCache.getContext(lastYear);
+      if (ctx) {
+        elEraCtx.textContent = ctx;
+        elEraCtx.hidden = false;
+      } else {
+        elEraCtx.hidden = true;
+        elEraCtx.textContent = '';
+      }
+
       requestAnimationFrame(() => {
         requestAnimationFrame(() => elEvent.classList.add('visible'));
       });
@@ -969,6 +1002,8 @@
         if (resp.ok) {
           const data = await resp.json();
           const events = (data.events || []).map(e => e.text || e).filter(Boolean);
+          // Store era context sentence for this year if present
+          if (data.context) yearCache.storeContext(year, data.context);
           if (events.length > 0) {
             yearCache.store(year, events, 'API');
             return events;
