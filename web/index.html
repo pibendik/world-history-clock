@@ -717,6 +717,7 @@
         this._cache = new Map(); // year -> { events: [], index: 0, source: '' }
         this._topicIndex = new Map(); // `${year}:${topic}` -> index
         this._context = new Map(); // year -> context sentence string
+        this._tried = new Set(); // years we've fetched from API (even if no events returned)
       }
 
       store(year, events, source) {
@@ -731,6 +732,9 @@
       }
 
       getContext(year) { return this._context.get(year) || null; }
+
+      markTried(year) { this._tried.add(year); }
+      hasTried(year) { return this._tried.has(year); }
 
       getNext(year) {
         const entry = this._cache.get(year);
@@ -872,7 +876,7 @@
       elEraCtx.textContent = '';
     }
 
-    function showEvent(lines, source, sourceUrl, counter = '') {
+    function showEvent(lines, source, sourceUrl, counter = '', displayYear = lastYear) {
       elEvent.classList.remove('visible');
       elEvent.textContent = lines;
       currentEventText = lines;
@@ -897,8 +901,8 @@
         const counterHtml = counter ? ` <span style="opacity:0.5;font-size:0.85em">(${sanitise(counter)})</span>` : '';
         elSource.innerHTML = srcHtml + counterHtml;
 
-        // Show era context sentence if available for the current year
-        const ctx = yearCache.getContext(lastYear);
+        // Show era context sentence for the year being displayed
+        const ctx = yearCache.getContext(displayYear);
         if (ctx) {
           elEraCtx.textContent = ctx;
           elEraCtx.hidden = false;
@@ -1015,22 +1019,24 @@
       return combined;
     }
 
-    // Proxy: tries the FastAPI backend first, falls back to direct Wikidata.
+    // Proxy: tries the FastAPI backend first, falls back to direct Wikidata only if
+    // the backend is completely unreachable (not just returning empty results).
     async function fetchWikidata(year) {
       try {
-        const resp = await fetch(`${API_URL}/year/${year}`, { signal: AbortSignal.timeout(8000) });
+        const resp = await fetch(`${API_URL}/year/${year}`, { signal: AbortSignal.timeout(30000) });
         if (resp.ok) {
           const data = await resp.json();
           const events = (data.events || []).map(e => e.text || e).filter(Boolean);
-          // Store era context sentence for this year if present
           if (data.context) yearCache.storeContext(year, data.context);
           if (events.length > 0) {
             yearCache.store(year, events, 'API');
-            return events;
           }
+          // API responded — trust it even if empty. Don't fall through to direct
+          // Wikidata: that causes 429 rate limiting from multiple browser tabs.
+          return events;
         }
       } catch (_) {
-        // Backend unreachable — fall through to direct Wikidata
+        // Backend unreachable or timed out — fall through to direct Wikidata below
       }
       return await fetchWikidataDirect(year);
     }
@@ -1048,10 +1054,11 @@
         };
       }
       try {
-        if (!yearCache.has(year)) {
+        if (!yearCache.has(year) && !yearCache.hasTried(year)) {
           const labels = await fetchWikidata(year);
+          yearCache.markTried(year); // remember we tried, even if no results
           allLabels = labels;
-        } else if (allLabels.length === 0) {
+        } else if (yearCache.has(year) && allLabels.length === 0) {
           allLabels = yearCache._cache.get(year)?.events || [];
         }
         if (yearCache.has(year)) {
@@ -1079,7 +1086,7 @@
     async function fetchEvent(year) {
       if (eventBuffer.has(year)) {
         const cached = eventBuffer.get(year);
-        showEvent(cached.text, cached.source, cached.url);
+        showEvent(cached.text, cached.source, cached.url, '', year);
         if (yearCache.has(year)) {
           allLabels = yearCache._cache.get(year)?.events || [];
           renderTopicChips(classifyTopics(allLabels));
@@ -1092,10 +1099,10 @@
       const result = await fetchEventData(year);
       if (result) {
         eventBuffer.set(year, result);
-        showEvent(result.text, result.source, result.url);
+        showEvent(result.text, result.source, result.url, '', year);
         renderTopicChips(classifyTopics(allLabels));
       } else {
-        showEvent(getEraFallbackText(year), null, null);
+        showEvent(getEraFallbackText(year), null, null, '', year);
       }
       eventBuffer.prefetch(year, fetchEventData);
     }
@@ -1197,7 +1204,7 @@
           localStorage.setItem('clockapp-topic', label);
           eventBuffer._store.clear(); // topic change invalidates buffer
           renderTopicChips(availableTopics);
-          if (lastYear !== null) fetchEvent(lastYear);
+          if (lastYear !== null) fetchEvent(viewingYear !== null ? viewingYear : lastYear);
         });
         row.appendChild(chip);
       });
@@ -1219,14 +1226,14 @@
               localStorage.setItem('clockapp-topic', 'All');
             }
             renderTopicChips(availableTopics);
-            if (lastYear !== null) fetchEvent(lastYear);
+            if (lastYear !== null) fetchEvent(viewingYear !== null ? viewingYear : lastYear);
             return;
           }
           activeTopic = ct.label;
           localStorage.setItem('clockapp-topic', ct.label);
           eventBuffer._store.clear();
           renderTopicChips(availableTopics);
-          if (lastYear !== null) fetchEvent(lastYear);
+          if (lastYear !== null) fetchEvent(viewingYear !== null ? viewingYear : lastYear);
         });
         row.appendChild(chip);
       }
@@ -1345,8 +1352,9 @@
     document.getElementById('dislikeBtn').addEventListener('click', () => {
       if (currentEventText) {
         recordReaction(lastYear, currentEventText, currentSource, 'dislike');
-        eventBuffer._store.delete(lastYear); // remove stale cached entry
-        fetchEvent(lastYear);
+        const displayYear = viewingYear !== null ? viewingYear : lastYear;
+        eventBuffer._store.delete(displayYear);
+        fetchEvent(displayYear);
       }
     });
     document.getElementById('savedListBtn').addEventListener('click', () => {
@@ -1413,7 +1421,7 @@
       localStorage.setItem('clockapp-topic', name);
       eventBuffer._store.clear();
       renderTopicChips();
-      if (lastYear !== null) fetchEvent(lastYear);
+      if (lastYear !== null) fetchEvent(viewingYear !== null ? viewingYear : lastYear);
     });
     // ─────────────────────────────────────────────────────────────────────────
 
