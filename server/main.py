@@ -10,7 +10,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from clockapp.data.epochs import format_era_display, get_context_for_year, get_eras_for_year
+from clockapp.data.epochs import format_era_display, get_context_for_year, get_eras_for_year, get_future_events_for_year
 from clockapp.server.db import (
     get_era_exposure,
     get_reactions,
@@ -62,6 +62,7 @@ class SaveBody(BaseModel):
 def _build_year_data(year: int) -> dict:
     is_future = year > settings.current_year
     events = [] if is_future else get_events_for_year(year)
+    future_events = get_future_events_for_year(year) if is_future else []
     eras = get_eras_for_year(year)
     era_display = format_era_display(year)
     context = get_context_for_year(year)
@@ -72,6 +73,7 @@ def _build_year_data(year: int) -> dict:
     return {
         "year": year,
         "events": events,
+        "future_events": future_events,
         "eras": eras,
         "era_display": era_display,
         "context": context,

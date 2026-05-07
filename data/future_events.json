@@ -1,0 +1,226 @@
+{
+  "_comment": "Curated future events for the Year Clock (2026-2359). Three types: astronomy, fiction, scheduled. Sources cited for each. Generated and maintained manually; see generate_future_events.py for extending with Skyfield.",
+
+  "2029": [
+    {
+      "text": "Asteroid Apophis (340m wide) passes within 31,600 km of Earth — closer than many satellites, briefly visible to the naked eye. The closest approach of a large asteroid in recorded history.",
+      "type": "astronomy",
+      "source": "NASA/JPL Center for Near Earth Object Studies"
+    }
+  ],
+  "2031": [
+    {
+      "text": "In Isaac Asimov's robot stories, the positronic brain becomes commercially viable, beginning the age of domestic robots.",
+      "type": "fiction",
+      "source": "I, Robot (Isaac Asimov, 1950)"
+    }
+  ],
+  "2035": [
+    {
+      "text": "In the Will Smith film adaptation of Asimov's 'I, Robot', robots outnumber humans and a vast network called VIKI plots to control humanity for its own protection.",
+      "type": "fiction",
+      "source": "I, Robot (film, 2004)"
+    }
+  ],
+  "2038": [
+    {
+      "text": "Unix time overflows: 32-bit systems that store time as seconds since 1 January 1970 will roll over to a negative number on 19 January 2038 at 03:14:08 UTC — the 'Year 2038 problem'.",
+      "type": "scheduled",
+      "source": "IEEE/POSIX standard"
+    }
+  ],
+  "2040": [
+    {
+      "text": "Great Conjunction: Jupiter and Saturn align closely in the sky, appearing as a brilliant double-star. These rare meetings occur roughly every 20 years; the previous conjunction in 2020 was the closest since 1226.",
+      "type": "astronomy",
+      "source": "JPL Horizons / computed orbital mechanics"
+    }
+  ],
+  "2044": [
+    {
+      "text": "In Ernest Cline's 'Ready Player One', energy shortages and inequality have driven billions of people to spend their lives inside the OASIS virtual reality.",
+      "type": "fiction",
+      "source": "Ready Player One (Ernest Cline, 2011)"
+    }
+  ],
+  "2045": [
+    {
+      "text": "Ray Kurzweil's predicted year of the Technological Singularity — the point at which artificial superintelligence surpasses human intelligence and accelerates beyond any predictable trajectory.",
+      "type": "scheduled",
+      "source": "The Singularity Is Near (Ray Kurzweil, 2005)"
+    }
+  ],
+  "2049": [
+    {
+      "text": "In Blade Runner 2049, humanoid replicants are a common part of society. The Nexus-8 and later models have open-ended lifespans, and a rebellion is brewing.",
+      "type": "fiction",
+      "source": "Blade Runner 2049 (film, 2017)"
+    }
+  ],
+  "2052": [
+    {
+      "text": "Jorgen Randers' 'Club of Rome' forecast: global population peaks at about 8 billion, climate change is not solved in time, and economic growth in rich nations has stalled.",
+      "type": "scheduled",
+      "source": "2052: A Global Forecast for the Next Forty Years (Randers, 2012)"
+    }
+  ],
+  "2057": [
+    {
+      "text": "In Arthur C. Clarke's '2061: Odyssey Three', the spaceship Universe is nearing Jupiter on a mission to Halley's Comet — four years before the actual perihelion.",
+      "type": "fiction",
+      "source": "2061: Odyssey Three (Arthur C. Clarke, 1987)"
+    }
+  ],
+  "2061": [
+    {
+      "text": "Halley's Comet returns to the inner solar system, reaching perihelion around July 28. Visible to the naked eye, this will be its 30th observed return since 240 BCE — when Chinese astronomers first recorded it.",
+      "type": "astronomy",
+      "source": "JPL Horizons / Yeomans & Kiang 1981"
+    },
+    {
+      "text": "Setting of Arthur C. Clarke's '2061: Odyssey Three': a crewed expedition lands on Halley's Comet and discovers that Europa's ocean harbours life.",
+      "type": "fiction",
+      "source": "2061: Odyssey Three (Arthur C. Clarke, 1987)"
+    }
+  ],
+  "2063": [
+    {
+      "text": "In Star Trek lore, Zefram Cochrane makes humanity's first warp flight on April 5, 2063, attracting a passing Vulcan survey ship and triggering First Contact.",
+      "type": "fiction",
+      "source": "Star Trek: First Contact (film, 1996)"
+    }
+  ],
+  "2079": [
+    {
+      "text": "Great Conjunction: Jupiter and Saturn align once more. These events were considered omens by astrologers throughout history — the 1226 conjunction marked the height of Genghis Khan's empire.",
+      "type": "astronomy",
+      "source": "JPL Horizons / computed orbital mechanics"
+    }
+  ],
+  "2081": [
+    {
+      "text": "In Kurt Vonnegut's story 'Harrison Bergeron', total equality has been enforced by law: talented and intelligent people are handicapped so that no one is above average.",
+      "type": "fiction",
+      "source": "Harrison Bergeron (Kurt Vonnegut, 1961)"
+    }
+  ],
+  "2099": [
+    {
+      "text": "In Marvel Comics, Miguel O'Hara becomes Spider-Man 2099, operating in a dystopian New York run by mega-corporations.",
+      "type": "fiction",
+      "source": "Spider-Man 2099 (Marvel Comics, 1992)"
+    }
+  ],
+  "2112": [
+    {
+      "text": "In Rush's concept album '2112', the Solar Federation — ruled by the Priests of the Temples of Syrinx — has banned all music. A lone man rediscovers a guitar and is destroyed for it.",
+      "type": "fiction",
+      "source": "2112 (Rush album, 1976)"
+    }
+  ],
+  "2117": [
+    {
+      "text": "Transit of Venus: for the first time since 2012, Venus passes directly across the face of the Sun — visible as a small black dot. These transits come in pairs 8 years apart, separated by over a century. The 1769 transit is why Captain Cook sailed to Tahiti.",
+      "type": "astronomy",
+      "source": "NASA / computed orbital mechanics"
+    }
+  ],
+  "2125": [
+    {
+      "text": "Second Transit of Venus in the 2117–2125 pair. After this, no human alive will ever see one — the next pair is not until 2247 and 2255.",
+      "type": "astronomy",
+      "source": "NASA / computed orbital mechanics"
+    }
+  ],
+  "2137": [
+    {
+      "text": "Halley's Comet returns again — its third appearance since 1986, completing another ~76-year orbit around the Sun.",
+      "type": "astronomy",
+      "source": "JPL / approximate orbital period projection"
+    }
+  ],
+  "2150": [
+    {
+      "text": "In Isaac Asimov's Foundation universe, the Galactic Empire is at its height — 20,000 inhabited worlds, trillions of citizens, and a bureaucracy so vast it has forgotten how to change.",
+      "type": "fiction",
+      "source": "Foundation series (Isaac Asimov, 1951–1993)"
+    }
+  ],
+  "2161": [
+    {
+      "text": "In the Star Trek universe, the United Federation of Planets is founded — a voluntary interstellar union born out of the Coalition of Planets formed after the Earth-Romulan War.",
+      "type": "fiction",
+      "source": "Star Trek canon (various series)"
+    }
+  ],
+  "2213": [
+    {
+      "text": "Halley's Comet completes yet another orbit, returning to perihelion roughly 76 years after its previous visit in 2137.",
+      "type": "astronomy",
+      "source": "JPL / approximate orbital period projection"
+    }
+  ],
+  "2233": [
+    {
+      "text": "In the Star Trek universe, James Tiberius Kirk is born in Riverside, Iowa — on the day a Romulan ship from the future destroys the USS Kelvin.",
+      "type": "fiction",
+      "source": "Star Trek (film, 2009)"
+    }
+  ],
+  "2239": [
+    {
+      "text": "The Jewish calendar reaches year 6000 — in some traditions, the threshold of the Messianic Age. Rosh Hashana 6000 falls in September 2239.",
+      "type": "scheduled",
+      "source": "Hebrew calendar (Anno Mundi)"
+    }
+  ],
+  "2245": [
+    {
+      "text": "In Star Trek, the USS Enterprise NCC-1701 is launched from the San Francisco Fleet Yards — the most famous starship in the Federation's history.",
+      "type": "fiction",
+      "source": "Star Trek canon"
+    }
+  ],
+  "2247": [
+    {
+      "text": "Transit of Venus: the first since 2125. Anyone alive for this transit has waited 122 years since the last pair.",
+      "type": "astronomy",
+      "source": "NASA / computed orbital mechanics"
+    }
+  ],
+  "2255": [
+    {
+      "text": "Second Transit of Venus in the 2247–2255 pair — completing a cycle that began with the famous 1761/1769 transits used by Edmond Halley to measure the distance from Earth to the Sun.",
+      "type": "astronomy",
+      "source": "NASA / computed orbital mechanics"
+    }
+  ],
+  "2263": [
+    {
+      "text": "The five-year mission of the USS Enterprise under Captain James T. Kirk begins — exploring strange new worlds, seeking out new life and civilisations.",
+      "type": "fiction",
+      "source": "Star Trek: The Original Series (1966)"
+    }
+  ],
+  "2289": [
+    {
+      "text": "Halley's Comet returns once more — its fifth orbit since 1986, still faithfully tracing the same path it has followed for at least 2,000 years of recorded history.",
+      "type": "astronomy",
+      "source": "JPL / approximate orbital period projection"
+    }
+  ],
+  "2293": [
+    {
+      "text": "In Star Trek VI: The Undiscovered Country, the Klingon moon Praxis explodes. Kirk and the Enterprise crew negotiate the Khitomer Accords — ending decades of cold war between the Federation and the Klingon Empire.",
+      "type": "fiction",
+      "source": "Star Trek VI: The Undiscovered Country (film, 1991)"
+    }
+  ],
+  "2355": [
+    {
+      "text": "Jean-Luc Picard graduates from Starfleet Academy. In nine years he will take command of the USS Enterprise NCC-1701-D.",
+      "type": "fiction",
+      "source": "Star Trek: The Next Generation (1987)"
+    }
+  ]
+}

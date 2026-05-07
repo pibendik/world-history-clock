@@ -740,6 +740,26 @@
       }
 
       has(year) { return this._cache.has(year) && this._cache.get(year).events.length > 0; }
+
+      storeFutureEvents(year, events) {
+        if (events && events.length > 0) {
+          this._future = this._future || new Map();
+          if (!this._future.has(year)) this._future.set(year, { events, index: 0 });
+        }
+      }
+
+      getNextFutureEvent(year) {
+        if (!this._future) return null;
+        const entry = this._future.get(year);
+        if (!entry || entry.events.length === 0) return null;
+        const ev = entry.events[entry.index % entry.events.length];
+        entry.index++;
+        return ev;
+      }
+
+      hasFutureEvents(year) {
+        return !!(this._future && this._future.has(year) && this._future.get(year).events.length > 0);
+      }
     }
 
     const yearCache = new YearCache();
@@ -1007,6 +1027,9 @@
           const data = await resp.json();
           const events = (data.events || []).map(e => e.text || e).filter(Boolean);
           if (data.context) yearCache.storeContext(year, data.context);
+          if (data.future_events && data.future_events.length > 0) {
+            yearCache.storeFutureEvents(year, data.future_events);
+          }
           if (events.length > 0) {
             yearCache.store(year, events, 'API');
           }
@@ -1024,6 +1047,20 @@
     // Uses yearCache for raw labels, applies topic/dislike filters, returns {text, source, url}.
     async function fetchEventData(year) {
       if (year > CURRENT_YEAR) {
+        // Fetch from API if not tried yet (populates future_events in yearCache)
+        if (!yearCache.hasTried(year)) {
+          yearCache.markTried(year);
+          await fetchWikidata(year).catch(() => {});
+        }
+        if (yearCache.hasFutureEvents(year)) {
+          const ev = yearCache.getNextFutureEvent(year);
+          const typeIcon = ev.type === 'astronomy' ? '🔭' : ev.type === 'fiction' ? '📖' : '📅';
+          return {
+            text: `${typeIcon} ${ev.text}`,
+            source: ev.source || null,
+            url: null
+          };
+        }
         const futureEra = formatEraDisplay(year);
         return {
           text: futureEra

@@ -3,6 +3,7 @@ from pathlib import Path
 
 _DATA_FILE = Path(__file__).parent / "epochs.json"
 _CONTEXT_FILE = Path(__file__).parent / "era_context.json"
+_FUTURE_FILE = Path(__file__).parent / "future_events.json"
 
 def _load_eras() -> list[dict]:
     with open(_DATA_FILE, encoding="utf-8") as f:
@@ -12,6 +13,25 @@ def _load_eras() -> list[dict]:
 def _load_context() -> list[dict]:
     with open(_CONTEXT_FILE, encoding="utf-8") as f:
         return json.load(f)
+
+
+_future_events_cache: dict | None = None
+
+def _load_future_events() -> dict:
+    global _future_events_cache
+    if _future_events_cache is None:
+        with open(_FUTURE_FILE, encoding="utf-8") as f:
+            raw = json.load(f)
+        # Exclude the metadata comment key; convert string keys to int
+        _future_events_cache = {
+            int(k): v for k, v in raw.items() if not k.startswith("_")
+        }
+    return _future_events_cache
+
+
+def get_future_events_for_year(year: int) -> list[dict]:
+    """Return curated future events for a given year, or empty list."""
+    return _load_future_events().get(year, [])
 
 
 def get_eras_for_year(year: int) -> list[dict]:
