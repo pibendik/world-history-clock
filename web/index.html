@@ -884,10 +884,18 @@
         /^\d{4} in /i,
         /one-year-period/i,
         /^\d{3,4}[-–]\d{2,4}$/,
+        // Astronomical events
+        /^(Solar|Lunar) eclipse of /i,
+        /^Transit of (Mercury|Venus|Mars)/i,
+        /^Occultation of /i,
+        /^(Annular|Total|Partial|Hybrid) (solar|lunar) eclipse/i,
+        // Astronomical catalog objects
         /^NGC \d+/i,
         /^IC \d+$/i,
+        /^(Messier|M) \d+$/i,
         /^\(\d{2,}\) \w/,
         /\bmain.belt asteroid\b/i,
+        /\bnear.Earth (asteroid|object)\b/i,
         /\bSocket \d+\b/i,
         /^Category:/i,
         /^SCP-\d+/i,
@@ -897,8 +905,8 @@
       const isInteresting = (label) => {
         if (!label) return false;
         if (Q_CODE.test(label)) return false;
-        if (!label.includes(' ')) return false;       // must have at least 2 words
-        if (label.trim().length < 20) return false;   // must be long enough
+        if (!label.includes(' ')) return false;
+        if (label.trim().length < 20) return false;
         return !BORING_PATTERNS.some(p => p.test(label));
       };
 
@@ -910,6 +918,13 @@
         'FILTER NOT EXISTS { ?event wdt:P31 wd:Q17633526. }',
         'FILTER NOT EXISTS { ?event wdt:P31 wd:Q3863. }',
         'FILTER NOT EXISTS { ?event wdt:P31 wd:Q61788250. }',
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q188025. }',    // solar eclipse
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q3234690. }',   // lunar eclipse
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q645883. }',    // occultation
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q107024. }',    // meteor shower
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q1151284. }',   // transit of a planet
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q523. }',       // star
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q318. }',       // galaxy
       ].join('\n  ');
 
       const runQuery = async (sparql) => {

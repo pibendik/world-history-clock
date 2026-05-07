@@ -8,8 +8,9 @@ import requests
 from clockapp.server.config import settings
 from clockapp.server.db import get_cached_events, store_events
 
-# Exclude known garbage entity types directly in SPARQL — much faster than
-# post-filtering and avoids filling the LIMIT with useless results.
+# ---------------------------------------------------------------------------
+# SPARQL-level exclusions — stop boring types from consuming LIMIT slots
+# ---------------------------------------------------------------------------
 _P31_EXCLUSIONS = " ".join([
     "FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }",   # list article
     "FILTER NOT EXISTS { ?event wdt:P31 wd:Q14204246. }",   # Wikimedia disambiguation
@@ -19,7 +20,21 @@ _P31_EXCLUSIONS = " ".join([
     "FILTER NOT EXISTS { ?event wdt:P31 wd:Q3863. }",       # asteroid
     "FILTER NOT EXISTS { ?event wdt:P31 wd:Q202444. }",     # given name
     "FILTER NOT EXISTS { ?event wdt:P31 wd:Q61788250. }",   # one-year-period
+    # Astronomical events — common and rarely interesting to a general audience
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q188025. }",     # solar eclipse
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q3234690. }",    # lunar eclipse
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q645883. }",     # occultation
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q17524420. }",   # aspect (astrology/astronomy)
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q107024. }",     # meteor shower
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q1151284. }",    # transit of a planet
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q523. }",        # star
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q318. }",        # galaxy
+    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q2154519. }",    # planetary transit
 ])
+
+# ---------------------------------------------------------------------------
+# SPARQL query templates
+# ---------------------------------------------------------------------------
 
 SPARQL_P585 = """
 SELECT DISTINCT ?eventLabel WHERE {{
@@ -39,9 +54,24 @@ SELECT DISTINCT ?eventLabel WHERE {{
 }} LIMIT 15
 """.format(exclusions=_P31_EXCLUSIONS).replace("{{year}}", "{year}")
 
+# Dedicated query for notable humans — births AND deaths in the year.
+# People are almost always interesting; P21 ensures they have a gender
+# statement (a rough proxy for notability/completeness in Wikidata).
+SPARQL_HUMANS = """
+SELECT DISTINCT ?eventLabel WHERE {{
+  {{ ?event wdt:P569 ?date. }} UNION {{ ?event wdt:P570 ?date. }}
+  FILTER(YEAR(?date) = {{year}})
+  ?event wdt:P31 wd:Q5.
+  ?event wdt:P21 [].
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}} LIMIT 15
+""".replace("{{year}}", "{year}")
+
 HEADERS = {"User-Agent": "YearClock/1.0 (educational project; historieklokka.no)"}
 
-# Patterns that identify labels as uninteresting to a general human reader.
+# ---------------------------------------------------------------------------
+# Label-level boring-pattern filter
+# ---------------------------------------------------------------------------
 _BORING_PATTERNS = [
     # Sports participation entries
     re.compile(r'.+ at the \d{4} (Summer|Winter) Olympics?$', re.I),
@@ -56,7 +86,12 @@ _BORING_PATTERNS = [
     re.compile(r'^\d{4} in ', re.I),
     re.compile(r'one-year-period', re.I),
     re.compile(r'^\d{3,4}[-–]\d{2,4}$'),            # "939-940" pure date range
-    # Astronomical catalog objects (not interesting without context)
+    # Astronomical events (belt-and-suspenders: SPARQL exclusions are primary)
+    re.compile(r'^(Solar|Lunar) eclipse of ', re.I),
+    re.compile(r'^Transit of (Mercury|Venus|Mars)', re.I),
+    re.compile(r'^Occultation of ', re.I),
+    re.compile(r'^(Annular|Total|Partial|Hybrid) (solar|lunar) eclipse', re.I),
+    # Astronomical catalog objects
     re.compile(r'^NGC \d+', re.I),
     re.compile(r'^IC \d+$', re.I),
     re.compile(r'^(Messier|M) \d+$', re.I),
@@ -80,23 +115,18 @@ _BORING_PATTERNS = [
     re.compile(r'^\d{3,4}$'),
 ]
 
-# Regex to detect bare Q-codes (e.g. "Q23422") — not human-readable labels.
 _Q_CODE_RE = re.compile(r'^Q\d+$')
 
 
 def _is_interesting_label(label: str) -> bool:
     """Return True only if the label is likely to be interesting to a human reader."""
     label = label.strip()
-    # Bare Wikidata Q-code — entity has no English label
     if _Q_CODE_RE.match(label):
         return False
-    # Must contain at least one space (reject single-word/number labels)
     if ' ' not in label:
         return False
-    # Must be long enough to convey meaningful information
     if len(label) < 20:
         return False
-    # Must not match any of the known boring patterns
     if any(p.search(label) for p in _BORING_PATTERNS):
         return False
     return True
@@ -120,12 +150,19 @@ def _run_query(template: str, year: int) -> list[str]:
 
 
 def fetch_wikidata_events(year: int) -> list[str]:
-    """Run both SPARQL queries, deduplicate, and filter uninteresting labels."""
+    """
+    Run three SPARQL queries, deduplicate, and filter uninteresting labels.
+    Query order determines display priority:
+      1. P585 (point in time) — actual events, discoveries, battles, etc.
+      2. Notable humans (births/deaths) — almost always interesting
+      3. P571 (inception) — institutions, buildings, organisations founded
+    """
     labels1 = _run_query(SPARQL_P585, year)
-    labels2 = _run_query(SPARQL_P571, year)
+    labels2 = _run_query(SPARQL_HUMANS, year)
+    labels3 = _run_query(SPARQL_P571, year)
     seen: set[str] = set()
     combined: list[str] = []
-    for label in labels1 + labels2:
+    for label in labels1 + labels2 + labels3:
         if label not in seen:
             seen.add(label)
             combined.append(label)
