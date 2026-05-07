@@ -91,18 +91,31 @@ echo ""
 echo "🩺 Waiting for health check (20s)..."
 sleep 20
 
-DOMAIN=$(grep ^YEARCLOCK_DOMAIN .env | cut -d= -f2 | tr -d '"')
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/api/v1/year/2000" || echo "000")
+# Read domain from server (not locally — .env is gitignored)
+DOMAIN=$(ssh "$SERVER" "grep ^YEARCLOCK_DOMAIN $REPO_DIR/.env 2>/dev/null | cut -d= -f2 | tr -d '\"'" 2>/dev/null || echo "")
 
-if [[ "$HTTP_STATUS" == "200" ]]; then
-    echo ""
-    echo "✅ Deploy successful! App is live at https://$DOMAIN"
-    if [[ "$CLEAR_CACHE" == true ]]; then
-        echo "   Cache cleared — warmer is refilling from current hour forward (~2h for full warm)"
+if [[ -z "$DOMAIN" ]]; then
+    echo "⚠️  Could not read YEARCLOCK_DOMAIN from server .env — skipping HTTPS health check"
+    # Fall back: check internal health endpoint directly
+    INTERNAL_OK=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' --max-time 10 'http://localhost:8421/health' 2>/dev/null || echo '000'")
+    if [[ "$INTERNAL_OK" == "200" ]]; then
+        echo "✅ API is healthy (internal check passed). Visit your site to confirm."
+    else
+        echo "⚠️  API health check returned $INTERNAL_OK — check logs:"
+        echo "   ssh $SERVER 'cd $REPO_DIR && docker compose -f docker-compose.prod.yml logs --tail=50'"
     fi
 else
-    echo ""
-    echo "⚠️  Health check returned HTTP $HTTP_STATUS (expected 200)"
-    echo "   Check logs:"
-    echo "   ssh $SERVER 'cd $REPO_DIR && docker compose -f docker-compose.prod.yml logs --tail=50'"
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/api/v1/year/2000" || echo "000")
+    if [[ "$HTTP_STATUS" == "200" ]]; then
+        echo ""
+        echo "✅ Deploy successful! App is live at https://$DOMAIN"
+        if [[ "$CLEAR_CACHE" == true ]]; then
+            echo "   Cache cleared — warmer is refilling from current hour forward (~2h for full warm)"
+        fi
+    else
+        echo ""
+        echo "⚠️  Health check returned HTTP $HTTP_STATUS (expected 200)"
+        echo "   Check logs:"
+        echo "   ssh $SERVER 'cd $REPO_DIR && docker compose -f docker-compose.prod.yml logs --tail=50'"
+    fi
 fi
