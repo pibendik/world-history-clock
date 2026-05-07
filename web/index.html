@@ -78,18 +78,7 @@
       line-height: 1;
     }
 
-    .time-military .seconds {
-      font-size: 0.45em;
-      color: var(--text-muted);
-      vertical-align: middle;
-    }
-
-    .time-12hr {
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      margin-top: 0.3rem;
-      font-variant-numeric: tabular-nums;
-    }
+    .time-military .seconds { display: none; }
 
     .year-card {
       width: 100%;
@@ -110,14 +99,6 @@
       background: linear-gradient(135deg, var(--accent-dim) 0%, transparent 60%);
       opacity: 0.15;
       pointer-events: none;
-    }
-
-    .year-label {
-      font-size: 0.65rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 0.3rem;
     }
 
     .year-number {
@@ -238,6 +219,8 @@
       text-align: center;
       opacity: 0.5;
     }
+    .footer a { color: var(--text-muted); text-decoration: none; }
+    .footer a:hover { color: var(--accent); }
 
     .topic-row {
       width: 100%;
@@ -549,7 +532,6 @@
       <div class="time-military" id="timeMilitary">
         <span id="hhmm" title="Click to jump to a time">00:00</span><span class="seconds" id="ss">:00</span>
       </div>
-      <div class="time-12hr" id="time12hr">12:00:00 AM</div>
     </div>
 
     <button id="liveBtn" class="live-btn" aria-label="Return to live clock" hidden>
@@ -557,7 +539,6 @@
     </button>
 
     <div class="year-card">
-      <div class="year-label">Current Year</div>
       <div class="year-number" id="yearNumber">0000</div>
       <div class="year-era" id="yearEra"></div>
       <div class="era-badge" id="eraBadge"></div>
@@ -598,7 +579,7 @@
       </div>
     </div>
 
-    <p class="footer">Clock updates every second &bull; Events refresh each minute &bull; <a href="#" id="eraStatsLink" style="color:var(--accent)">📊 Era stats</a></p>
+    <p class="footer"><a href="https://github.com/pibendik/world-history-clock" target="_blank" rel="noopener">GitHub</a> &bull; <a href="#" id="eraStatsLink">📊 Era stats</a></p>
   </div>
 
   <div class="saved-panel" id="savedPanel" hidden>
@@ -696,8 +677,6 @@
     // ─────────────────────────────────────────────────────────────────────────
 
     const elHHMM     = document.getElementById('hhmm');
-    const elSS       = document.getElementById('ss');
-    const el12hr     = document.getElementById('time12hr');
     const elYear     = document.getElementById('yearNumber');
     const elEra      = document.getElementById('yearEra');
     const elEvent    = document.getElementById('eventText');
@@ -1118,17 +1097,12 @@
       const ssStr = String(ss).padStart(2, '0');
 
       elHHMM.textContent = `${hhStr}:${mmStr}`;
-      elSS.textContent   = `:${ssStr}`;
 
       // Keep slider in sync with live clock
       if (viewingYear === null) {
         const slider = document.getElementById('timelineSlider');
         if (slider) slider.value = hh * 60 + mm;
       }
-
-      const hour12  = hh % 12 || 12;
-      const ampm    = hh < 12 ? 'AM' : 'PM';
-      el12hr.textContent = `${String(hour12).padStart(2, '0')}:${mmStr}:${ssStr} ${ampm}`;
 
       // Update browser tab
       document.title = `${hhStr}:${mmStr} — What Year Does It Look Like?`;
