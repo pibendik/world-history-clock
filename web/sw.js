@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yearclock-v1';
+const CACHE_NAME = 'yearclock-v2';
 const STATIC_ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', event => {
@@ -19,9 +19,13 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  // Let API calls go through (Wikidata, Wikipedia)
-  if (url.hostname.includes('wikidata.org') || url.hostname.includes('wikipedia.org')) {
-    return; // network only for APIs
+  // Pass through: API calls (same-origin /api/ or external data sources)
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.hostname.includes('wikidata.org') ||
+    url.hostname.includes('wikipedia.org')
+  ) {
+    return; // network only
   }
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request))

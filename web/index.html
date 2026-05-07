@@ -615,7 +615,11 @@
   <script>
 
     const CURRENT_YEAR = new Date().getFullYear();
-    const API_BASE = 'http://localhost:8421';  // dev default; override via window.YEARCLOCK_API_BASE
+    // In production, API is on the same origin (Caddy proxies /api/*).
+    // In dev (localhost), fall back to the local API port.
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:8421'
+      : window.location.origin;
     const API_URL = (window.YEARCLOCK_API_BASE || API_BASE) + '/api/v1';
 
     function sanitise(str) {
