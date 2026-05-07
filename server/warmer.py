@@ -1,5 +1,6 @@
 """Background cache warmer: pre-fetches all 1440 year-slots."""
 import asyncio
+import datetime
 import logging
 
 from clockapp.server.db import get_cached_events
@@ -13,11 +14,11 @@ def _all_clock_years() -> list[int]:
     return [hh * 100 + mm for hh in range(24) for mm in range(60)]
 
 
-async def warm_cache(delay_seconds: float = 60.0) -> None:
+async def warm_cache(delay_seconds: float = 5.0) -> None:
     """
     Warm the cache for all 1440 clock years.
-    Runs at delay_seconds per year to avoid hammering Wikidata.
-    Skips years already cached.
+    Skips years already cached. Runs at delay_seconds per year.
+    At 5s/year → fills ~1440 uncached years in 2 hours.
     """
     years = _all_clock_years()
     filled = 0
@@ -49,9 +50,23 @@ async def warm_cache(delay_seconds: float = 60.0) -> None:
     )
 
 
-async def daily_refresh(interval_hours: float = 24.0) -> None:
-    """Periodically re-warm stale entries (faster pace since most are already cached)."""
+def _seconds_until_next_4am_utc() -> float:
+    """Seconds until the next 04:00 UTC."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    target = now.replace(hour=4, minute=0, second=0, microsecond=0)
+    if target <= now:
+        target += datetime.timedelta(days=1)
+    return (target - now).total_seconds()
+
+
+async def daily_refresh() -> None:
+    """Re-warm stale entries every night at 04:00 UTC."""
     while True:
-        await asyncio.sleep(interval_hours * 3600)
+        wait = _seconds_until_next_4am_utc()
+        logger.info(
+            "Daily refresh scheduled in %.0f minutes (at 04:00 UTC)",
+            wait / 60,
+        )
+        await asyncio.sleep(wait)
         logger.info("Daily cache refresh starting")
         await warm_cache(delay_seconds=5.0)

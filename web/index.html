@@ -1043,6 +1043,21 @@
           incrementEraExposure(bestEra.name);
         }
       }
+
+      // At second :50, silently prefetch the NEXT minute's year so the
+      // transition at :00 is instant rather than showing a loading spinner.
+      if (ss === 50 && viewingYear === null) {
+        const nextTotalMins = hh * 60 + mm + 1;
+        const nextHH = Math.floor(nextTotalMins / 60) % 24;
+        const nextMM = nextTotalMins % 60;
+        const nextYear = getYearFromTime(nextHH, nextMM);
+        if (!eventBuffer.has(nextYear)) {
+          eventBuffer.setFetching(nextYear);
+          fetchEventData(nextYear)
+            .then(result => { if (result) eventBuffer.set(nextYear, result); else eventBuffer._store.delete(nextYear); })
+            .catch(() => eventBuffer._store.delete(nextYear));
+        }
+      }
     }
 
     function classifyTopics(labels) {
@@ -1422,6 +1437,27 @@
     updateNavStatus();
     tick();
     setInterval(tick, 1000);
+
+    // Quietly pre-warm the next 60 minutes in the background so scrubbing
+    // forward through the hour is instant. Uses a 1s gap between fetches
+    // to avoid overwhelming the API on page load.
+    (async function prewarmNextHour() {
+      const now = new Date();
+      const startMins = now.getHours() * 60 + now.getMinutes();
+      for (let i = 1; i <= 60; i++) {
+        const totalMins = (startMins + i) % 1440;
+        const fhh = Math.floor(totalMins / 60);
+        const fmm = totalMins % 60;
+        const year = getYearFromTime(fhh, fmm);
+        if (!eventBuffer.has(year)) {
+          try {
+            const result = await fetchEventData(year);
+            if (result) eventBuffer.set(year, result);
+          } catch (_) {}
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    })();
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

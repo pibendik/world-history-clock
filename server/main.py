@@ -28,8 +28,8 @@ from clockapp.server.warmer import daily_refresh, warm_cache
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(warm_cache(delay_seconds=60.0))
-    asyncio.create_task(daily_refresh(interval_hours=24.0))
+    asyncio.create_task(warm_cache(delay_seconds=5.0))
+    asyncio.create_task(daily_refresh())
     yield
 
 
