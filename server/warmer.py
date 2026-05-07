@@ -14,17 +14,36 @@ def _all_clock_years() -> list[int]:
     return [hh * 100 + mm for hh in range(24) for mm in range(60)]
 
 
+def _prioritised_years() -> list[int]:
+    """
+    Return all 1440 clock years ordered so the most immediately useful ones
+    come first. Starts from ~now and wraps around, so after a daytime deploy
+    the current and upcoming hours are cached within minutes rather than hours.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    all_years = _all_clock_years()
+    # Find the index closest to the current UTC time
+    current = now.hour * 100 + now.minute
+    # Binary search isn't needed — just find the first year >= current
+    start = next((i for i, y in enumerate(all_years) if y >= current), 0)
+    return all_years[start:] + all_years[:start]
+
+
 async def warm_cache(delay_seconds: float = 5.0) -> None:
     """
     Warm the cache for all 1440 clock years.
     Skips years already cached. Runs at delay_seconds per year.
+    Starts from the current UTC time so today's remaining hours are cached first.
     At 5s/year → fills ~1440 uncached years in 2 hours.
     """
-    years = _all_clock_years()
+    years = _prioritised_years()
     filled = 0
     skipped = 0
     failed = 0
-    logger.info("Cache warmer starting: %d years to check", len(years))
+    logger.info(
+        "Cache warmer starting: %d years to check (from year %d forward)",
+        len(years), years[0],
+    )
 
     for year in years:
         try:
