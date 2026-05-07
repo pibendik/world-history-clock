@@ -7,6 +7,7 @@ import requests
 
 from clockapp.server.config import settings
 from clockapp.server.db import get_cached_events, store_events
+from clockapp.server.scorer import score_events
 
 # ---------------------------------------------------------------------------
 # SPARQL-level exclusions — stop boring types from consuming LIMIT slots
@@ -183,7 +184,7 @@ def fetch_wikidata_events(year: int) -> list[str]:
         if label not in seen:
             seen.add(label)
             combined.append(label)
-    return combined
+    return score_events(year, combined)
 
 
 def get_events_for_year(year: int) -> list[dict]:
