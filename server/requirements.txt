@@ -3,3 +3,4 @@ uvicorn[standard]
 requests
 pydantic
 pydantic-settings>=2.0
+openai>=1.0
