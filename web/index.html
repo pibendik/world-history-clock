@@ -867,17 +867,46 @@
     }
 
     async function fetchWikidataDirect(year) {
+      // Must match the server-side _is_interesting_label() logic in fetcher.py
+      const Q_CODE = /^Q\d+$/;
       const BORING_PATTERNS = [
         /^.+ at the \d{4} (Summer|Winter) Olympics?$/i,
         /^.+ at the \d{4} (Summer|Winter) Paralympic Games?$/i,
         /^.+ at the \d{4} (Summer|Winter) Youth Olympics?$/i,
         /^.+ at the \d{4} Commonwealth Games?$/i,
-        /^.+ at the \d{4} (FIFA|UEFA|FIBA|IAAF|UCI)/i,
-        /^\d{4}[-–]\d{2,4} .*(season|league|championship)$/i,
+        /^.+ at the \d{4} (FIFA|UEFA|FIBA|IAAF|UCI|IIHF)/i,
+        /^\d{4}[-–]\d{2,4} .*(season|league|championship|cup)$/i,
         /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/i,
         /^\d{4} in /i,
+        /one-year-period/i,
+        /^\d{3,4}[-–]\d{2,4}$/,
+        /^NGC \d+/i,
+        /^IC \d+$/i,
+        /^\(\d{2,}\) \w/,
+        /\bmain.belt asteroid\b/i,
+        /\bSocket \d+\b/i,
+        /^Category:/i,
+        /^SCP-\d+/i,
+        /reserved for private use/i,
+        /^\d+$/,
       ];
-      const isBoringLabel = (label) => BORING_PATTERNS.some(p => p.test(label));
+      const isInteresting = (label) => {
+        if (!label) return false;
+        if (Q_CODE.test(label)) return false;
+        if (!label.includes(' ')) return false;       // must have at least 2 words
+        if (label.trim().length < 20) return false;   // must be long enough
+        return !BORING_PATTERNS.some(p => p.test(label));
+      };
+
+      const P31_EXCL = [
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }',
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q14204246. }',
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q21199. }',
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q4167836. }',
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q17633526. }',
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q3863. }',
+        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q61788250. }',
+      ].join('\n  ');
 
       const runQuery = async (sparql) => {
         const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
@@ -886,23 +915,22 @@
         const data = await resp.json();
         return data.results.bindings
           .map(b => b.eventLabel?.value)
-          .filter(v => v && !v.startsWith('Q') && !isBoringLabel(v));
+          .filter(isInteresting);
       };
 
       const q1 = `SELECT DISTINCT ?eventLabel WHERE {
   ?event wdt:P585 ?date.
   FILTER(YEAR(?date) = ${year})
-  FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }
-  FILTER NOT EXISTS { ?event wdt:P31 wd:Q14204246. }
+  ${P31_EXCL}
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-} LIMIT 15`;
+} LIMIT 20`;
 
       const q2 = `SELECT DISTINCT ?eventLabel WHERE {
   ?event wdt:P571 ?date.
   FILTER(YEAR(?date) = ${year})
-  FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }
+  ${P31_EXCL}
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-} LIMIT 10`;
+} LIMIT 15`;
 
       const [labels1, labels2] = await Promise.all([runQuery(q1), runQuery(q2)]);
       const seen = new Set();

@@ -132,6 +132,19 @@ def list_eras():
     return get_era_exposure()
 
 
+@router.delete("/cache")
+def clear_cache():
+    """Wipe the event cache so all years get re-fetched with current filters.
+    Use after deploying filter improvements."""
+    db = get_db()
+    try:
+        db.execute("DELETE FROM event_cache")
+        db.commit()
+        return {"status": "ok", "message": "event_cache cleared — warmer will refill at 5s/year"}
+    finally:
+        db.close()
+
+
 @router.get("/cache/status")
 def cache_status():
     """How many years are currently cached (non-expired)."""
