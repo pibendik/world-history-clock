@@ -1470,27 +1470,6 @@
     tick();
     setInterval(tick, 1000);
 
-    // Quietly pre-warm the next 60 minutes in the background so scrubbing
-    // forward through the hour is instant. Uses a 1s gap between fetches
-    // to avoid overwhelming the API on page load.
-    (async function prewarmNextHour() {
-      const now = new Date();
-      const startMins = now.getHours() * 60 + now.getMinutes();
-      for (let i = 1; i <= 60; i++) {
-        const totalMins = (startMins + i) % 1440;
-        const fhh = Math.floor(totalMins / 60);
-        const fmm = totalMins % 60;
-        const year = getYearFromTime(fhh, fmm);
-        if (!eventBuffer.has(year)) {
-          try {
-            const result = await fetchEventData(year);
-            if (result) eventBuffer.set(year, result);
-          } catch (_) {}
-        }
-        await new Promise(r => setTimeout(r, 1000));
-      }
-    })();
-
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
