@@ -72,7 +72,20 @@ def store_events(year: int, events: list[dict]) -> None:
         conn.close()
 
 
-def get_reactions() -> dict:
+def get_all_cached_years() -> list[tuple[int, list[dict]]]:
+    """Return (year, events) for all non-expired cache entries."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT year, events_json FROM event_cache WHERE fetched_at > ?",
+            (time.time() - _CACHE_TTL,),
+        ).fetchall()
+        return [(r["year"], json.loads(r["events_json"])) for r in rows]
+    finally:
+        conn.close()
+
+
+
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM reactions").fetchall()

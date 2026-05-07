@@ -3,8 +3,10 @@ import asyncio
 import datetime
 import logging
 
-from clockapp.server.db import get_cached_events
+from clockapp.server.db import get_cached_events, get_all_cached_years
 from clockapp.server.fetcher import get_events_for_year
+from clockapp.server.scorer import score_events
+from clockapp.server.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +80,35 @@ def _seconds_until_next_4am_utc() -> float:
     return (target - now).total_seconds()
 
 
+async def rescore_cache() -> None:
+    """
+    Re-run LLM scoring over all cached entries.
+    Called nightly when YEARCLOCK_LLM_SCORING is enabled, so that entries
+    stored before scoring was activated get cleaned up on the next 04:00 pass.
+    No-op if LLM scoring is disabled or OPENAI_API_KEY is unset.
+    """
+    if not settings.llm_scoring_enabled:
+        return
+    entries = get_all_cached_years()
+    if not entries:
+        return
+    logger.info("LLM rescore pass: %d cached years", len(entries))
+    rescored = 0
+    for year, events in entries:
+        try:
+            labels = [e["text"] for e in events]
+            filtered = score_events(year, labels)
+            if len(filtered) < len(labels):
+                from clockapp.server.db import store_events
+                store_events(year, [{"text": t, "source": "Wikidata"} for t in filtered])
+                rescored += 1
+        except Exception as exc:
+            logger.warning("Rescore failed for year %d: %s", year, exc)
+    logger.info("LLM rescore complete: updated %d / %d entries", rescored, len(entries))
+
+
 async def daily_refresh() -> None:
-    """Re-warm stale entries every night at 04:00 UTC."""
+    """Re-warm stale entries every night at 04:00 UTC, then rescore with LLM if enabled."""
     while True:
         wait = _seconds_until_next_4am_utc()
         logger.info(
@@ -89,3 +118,4 @@ async def daily_refresh() -> None:
         await asyncio.sleep(wait)
         logger.info("Daily cache refresh starting")
         await warm_cache(delay_seconds=5.0)
+        await rescore_cache()
