@@ -85,7 +85,7 @@ def get_all_cached_years() -> list[tuple[int, list[dict]]]:
         conn.close()
 
 
-
+def get_reactions() -> dict:
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM reactions").fetchall()
