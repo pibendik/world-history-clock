@@ -97,7 +97,7 @@ DOMAIN=$(ssh "$SERVER" "grep ^YEARCLOCK_DOMAIN $REPO_DIR/.env 2>/dev/null | cut 
 if [[ -z "$DOMAIN" ]]; then
     echo "⚠️  Could not read YEARCLOCK_DOMAIN from server .env — using docker exec fallback"
     # Fall back: exec inside the container (port 8421 is expose-only, not reachable from host)
-    INTERNAL_OK=$(ssh "$SERVER" "docker exec historieklokka-api-1 python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8421/health'); print('200')\" 2>/dev/null || echo '000'")
+    INTERNAL_OK=$(ssh "$SERVER" "docker exec historieklokka-api-1 python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8421/health'); print('200')\" 2>/dev/null" || echo "000")
     if [[ "$INTERNAL_OK" == "200" ]]; then
         echo "✅ API is healthy (internal check passed). Visit your site to confirm."
     else
@@ -105,8 +105,8 @@ if [[ -z "$DOMAIN" ]]; then
         echo "   ssh $SERVER 'cd $REPO_DIR && docker compose -f docker-compose.prod.yml logs --tail=50'"
     fi
 else
-    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/api/v1/year/2000")
-    [[ -z "$HTTP_STATUS" ]] && HTTP_STATUS="000"
+    # || true: curl exits non-zero on network errors; set -e would kill the script without this
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/api/v1/year/2000" || true)
     if [[ "$HTTP_STATUS" == "200" ]]; then
         echo ""
         echo "✅ Deploy successful! App is live at https://$DOMAIN"
@@ -115,7 +115,7 @@ else
         fi
     else
         echo ""
-        echo "⚠️  Health check returned HTTP $HTTP_STATUS (expected 200)"
+        echo "⚠️  Health check returned HTTP ${HTTP_STATUS:-000} (expected 200)"
         echo "   Check logs:"
         echo "   ssh $SERVER 'cd $REPO_DIR && docker compose -f docker-compose.prod.yml logs --tail=50'"
     fi
