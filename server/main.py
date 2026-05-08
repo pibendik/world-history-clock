@@ -115,6 +115,31 @@ def scorer_test():
         return {"status": "error", "detail": str(exc)}
 
 
+@app.get("/api/v1/debug/sparql")
+def debug_sparql(year: int = 1969):
+    """Diagnostic endpoint — runs one SPARQL query against Wikidata and returns
+    raw results. Use this to verify network connectivity and query correctness."""
+    import urllib.parse as _up
+    import requests as _req
+    from clockapp.server.fetcher import SPARQL_P585, HEADERS
+    query = SPARQL_P585.replace("{year}", str(year)).strip()
+    url = f"https://query.wikidata.org/sparql?format=json&query={_up.quote(query)}"
+    try:
+        resp = _req.get(url, headers=HEADERS, timeout=15)
+        bindings = resp.json().get("results", {}).get("bindings", []) if resp.ok else []
+        raw_labels = [b.get("eventLabel", {}).get("value", "") for b in bindings]
+        return {
+            "status": "ok",
+            "http_status": resp.status_code,
+            "year": year,
+            "raw_count": len(raw_labels),
+            "raw_labels": raw_labels[:10],
+            "query_preview": query[:300],
+        }
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc), "year": year}
+
+
 @router.get("/year/{year}")
 def get_year(year: int):
     return _build_year_data(year)

@@ -1,5 +1,6 @@
 """Wikidata fetching logic, adapted from clock.py."""
 
+import logging
 import re
 import urllib.parse
 
@@ -8,6 +9,8 @@ import requests
 from clockapp.server.config import settings
 from clockapp.server.db import get_cached_events, store_events
 from clockapp.server.scorer import score_events
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # SPARQL-level exclusions — stop boring types from consuming LIMIT slots
@@ -151,6 +154,7 @@ def _run_query(template: str, year: int) -> list[str]:
         url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
         resp = requests.get(url, headers=HEADERS, timeout=10)
         if not resp.ok:
+            logger.warning("SPARQL HTTP %s for year %d: %s", resp.status_code, year, resp.text[:200])
             return []
         bindings = resp.json().get("results", {}).get("bindings", [])
         return [
@@ -158,7 +162,8 @@ def _run_query(template: str, year: int) -> list[str]:
             for b in bindings
             if "eventLabel" in b and _is_interesting_label(b["eventLabel"]["value"])
         ]
-    except (requests.RequestException, ValueError, KeyError):
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        logger.warning("SPARQL query failed for year %d: %s: %s", year, type(exc).__name__, exc)
         return []
 
 
