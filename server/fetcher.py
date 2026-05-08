@@ -27,60 +27,36 @@ _last_query_time: float = 0.0
 _rate_limit_until: float = 0.0
 
 # ---------------------------------------------------------------------------
-# SPARQL-level exclusions — stop boring types from consuming LIMIT slots
-# ---------------------------------------------------------------------------
-_P31_EXCLUSIONS = " ".join([
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }",   # list article
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q14204246. }",   # Wikimedia disambiguation
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q21199. }",      # natural number
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q4167836. }",    # Wikimedia category
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q17633526. }",   # disambiguation page
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q3863. }",       # asteroid
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q202444. }",     # given name
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q61788250. }",   # one-year-period
-    # Astronomical events — common and rarely interesting to a general audience
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q188025. }",     # solar eclipse
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q3234690. }",    # lunar eclipse
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q645883. }",     # occultation
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q17524420. }",   # aspect (astrology/astronomy)
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q107024. }",     # meteor shower
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q1151284. }",    # transit of a planet
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q523. }",        # star
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q318. }",        # galaxy
-    "FILTER NOT EXISTS { ?event wdt:P31 wd:Q2154519. }",    # planetary transit
-])
-
-# ---------------------------------------------------------------------------
-# SPARQL query templates
+# SPARQL query templates — kept as lean as possible.
+# All heavyweight filtering is done in Python post-processing (_is_interesting_label).
+# The SPARQL FILTER NOT EXISTS clauses were removed because they made queries
+# too expensive for Wikidata's public endpoint (25+ second response times).
 # ---------------------------------------------------------------------------
 
-SPARQL_P585 = """
-SELECT DISTINCT ?eventLabel WHERE {{
-  ?event wdt:P585 ?date.
-  FILTER(YEAR(?date) = {{year}})
-  {exclusions}
-  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-}} LIMIT 20
-""".format(exclusions=_P31_EXCLUSIONS).replace("{{year}}", "{year}")
+SPARQL_P585 = (
+    "SELECT DISTINCT ?event ?eventLabel WHERE {\n"
+    "  ?event wdt:P585 ?date.\n"
+    "  FILTER(YEAR(?date) = {year})\n"
+    "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
+    "} LIMIT 30"
+)
 
 SPARQL_P571 = (
-    "SELECT DISTINCT ?eventLabel WHERE {\n"
+    "SELECT DISTINCT ?event ?eventLabel WHERE {\n"
     "  ?event wdt:P571 ?date.\n"
     "  FILTER(YEAR(?date) = {year})\n"
-    + "\n".join(f"  {f}" for f in _P31_EXCLUSIONS.split("\n") if f.strip()) + "\n"
     "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
-    "} LIMIT 15"
+    "} LIMIT 20"
 )
 
 # Dedicated query for notable humans — births AND deaths in the year.
 # For recent years (post-1850) add a sitelinks floor to prefer globally
 # notable people over obscure local figures.
 SPARQL_HUMANS_MODERN = (
-    "SELECT DISTINCT ?eventLabel WHERE {\n"
+    "SELECT DISTINCT ?event ?eventLabel WHERE {\n"
     "  { ?event wdt:P569 ?date. } UNION { ?event wdt:P570 ?date. }\n"
     "  FILTER(YEAR(?date) = {year})\n"
     "  ?event wdt:P31 wd:Q5.\n"
-    "  ?event wdt:P21 [].\n"
     "  ?event wikibase:sitelinks ?links.\n"
     "  FILTER(?links >= 20)\n"
     "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
@@ -88,13 +64,14 @@ SPARQL_HUMANS_MODERN = (
 )
 
 SPARQL_HUMANS = (
-    "SELECT DISTINCT ?eventLabel WHERE {\n"
+    "SELECT DISTINCT ?event ?eventLabel WHERE {\n"
     "  { ?event wdt:P569 ?date. } UNION { ?event wdt:P570 ?date. }\n"
     "  FILTER(YEAR(?date) = {year})\n"
     "  ?event wdt:P31 wd:Q5.\n"
-    "  ?event wdt:P21 [].\n"
+    "  ?event wikibase:sitelinks ?links.\n"
+    "  FILTER(?links >= 5)\n"
     "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
-    "} LIMIT 15"
+    "} ORDER BY DESC(?links) LIMIT 15"
 )
 
 HEADERS = {"User-Agent": "YearClock/1.0 (educational project; historieklokka.no)"}
@@ -178,7 +155,7 @@ def _run_query(template: str, year: int) -> list[str]:
         try:
             query = template.replace("{year}", str(year)).strip()
             url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
-            resp = requests.get(url, headers=HEADERS, timeout=20)
+            resp = requests.get(url, headers=HEADERS, timeout=30)
             if resp.status_code == 429:
                 retry_after = int(resp.headers.get("Retry-After", 120))
                 _rate_limit_until = time.time() + retry_after
