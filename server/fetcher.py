@@ -2,6 +2,7 @@
 
 import logging
 import re
+import threading
 import time
 import urllib.parse
 
@@ -13,9 +14,16 @@ from clockapp.server.scorer import score_events
 
 logger = logging.getLogger(__name__)
 
-# Module-level rate-limit tracker. When Wikidata returns 429, we record the
-# earliest time we're allowed to try again. All _run_query calls check this
-# before hitting the network so we don't hammer a rate-limited endpoint.
+# Serialize ALL outbound SPARQL requests so only one is in-flight at a time.
+# Without this, the warmer thread + concurrent user requests all pile up on
+# Wikidata simultaneously, causing cascading 429s and ReadTimeouts.
+_sparql_lock = threading.Lock()
+
+# Minimum seconds to wait between queries — even when Wikidata isn't complaining.
+_MIN_QUERY_INTERVAL = 3.0
+_last_query_time: float = 0.0
+
+# When Wikidata returns 429, record when we're allowed to try again.
 _rate_limit_until: float = 0.0
 
 # ---------------------------------------------------------------------------
@@ -155,36 +163,42 @@ def _is_interesting_label(label: str) -> bool:
 
 
 def _run_query(template: str, year: int) -> list[str]:
-    global _rate_limit_until
-    now = time.time()
-    if now < _rate_limit_until:
-        wait = int(_rate_limit_until - now)
-        logger.debug("Skipping SPARQL for year %d — rate-limited for %ds more", year, wait)
-        return []
-    try:
-        query = template.replace("{year}", str(year)).strip()
-        url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
-        resp = requests.get(url, headers=HEADERS, timeout=20)
-        if resp.status_code == 429:
-            retry_after = int(resp.headers.get("Retry-After", 120))
-            _rate_limit_until = time.time() + retry_after
-            logger.warning(
-                "Wikidata rate limited (429) for year %d — pausing %ds",
-                year, retry_after,
-            )
+    global _rate_limit_until, _last_query_time
+    with _sparql_lock:
+        now = time.time()
+        if now < _rate_limit_until:
+            wait = int(_rate_limit_until - now)
+            logger.debug("Skipping SPARQL for year %d — rate-limited for %ds more", year, wait)
             return []
-        if not resp.ok:
-            logger.warning("SPARQL HTTP %s for year %d: %s", resp.status_code, year, resp.text[:200])
+        # Enforce minimum spacing — avoids pileup even without a 429.
+        gap = _MIN_QUERY_INTERVAL - (now - _last_query_time)
+        if gap > 0:
+            time.sleep(gap)
+        _last_query_time = time.time()
+        try:
+            query = template.replace("{year}", str(year)).strip()
+            url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
+            resp = requests.get(url, headers=HEADERS, timeout=20)
+            if resp.status_code == 429:
+                retry_after = int(resp.headers.get("Retry-After", 120))
+                _rate_limit_until = time.time() + retry_after
+                logger.warning(
+                    "Wikidata rate limited (429) for year %d — pausing %ds",
+                    year, retry_after,
+                )
+                return []
+            if not resp.ok:
+                logger.warning("SPARQL HTTP %s for year %d: %s", resp.status_code, year, resp.text[:200])
+                return []
+            bindings = resp.json().get("results", {}).get("bindings", [])
+            return [
+                b["eventLabel"]["value"]
+                for b in bindings
+                if "eventLabel" in b and _is_interesting_label(b["eventLabel"]["value"])
+            ]
+        except (requests.RequestException, ValueError, KeyError) as exc:
+            logger.warning("SPARQL query failed for year %d: %s: %s", year, type(exc).__name__, exc)
             return []
-        bindings = resp.json().get("results", {}).get("bindings", [])
-        return [
-            b["eventLabel"]["value"]
-            for b in bindings
-            if "eventLabel" in b and _is_interesting_label(b["eventLabel"]["value"])
-        ]
-    except (requests.RequestException, ValueError, KeyError) as exc:
-        logger.warning("SPARQL query failed for year %d: %s: %s", year, type(exc).__name__, exc)
-        return []
 
 
 def fetch_wikidata_events(year: int) -> list[str]:

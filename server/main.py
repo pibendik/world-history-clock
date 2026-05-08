@@ -147,7 +147,24 @@ def get_year(year: int):
 
 @router.get("/year/{year}/buffer")
 def get_year_buffer(year: int, window: int = 2):
-    return {y: _build_year_data(y) for y in range(year - window, year + window + 1)}
+    """Return cached data for a window of years around `year`.
+    Never triggers Wikidata fetches — only reads from cache.
+    The warmer is responsible for filling the cache proactively."""
+    from clockapp.server.db import get_cached_events as _cached
+    result = {}
+    for y in range(year - window, year + window + 1):
+        cached = _cached(y)
+        if cached is not None:
+            eras = get_eras_for_year(y)
+            result[y] = {
+                "year": y,
+                "events": cached,
+                "eras": eras,
+                "era_display": format_era_display(y),
+                "context": get_context_for_year(y),
+                "is_future": y > settings.current_year,
+            }
+    return result
 
 
 @router.delete("/cache")

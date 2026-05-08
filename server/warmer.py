@@ -31,13 +31,16 @@ def _prioritised_years() -> list[int]:
     return all_years[start:] + all_years[:start]
 
 
-async def warm_cache(delay_seconds: float = 30.0) -> None:
+async def warm_cache(delay_seconds: float = 5.0) -> None:
     """
     Warm the cache for all 1440 clock years.
     Skips years already cached. Runs at delay_seconds per year.
     Starts from the current UTC time so today's remaining hours are cached first.
-    At 30s/year → fills ~1440 uncached years in ~12 hours.
-    Uses run_in_executor so sync HTTP calls don't block the event loop.
+
+    The real throttle is the threading.Lock in _run_query, which ensures only
+    one SPARQL request is in-flight at a time with at least 3s between queries.
+    Three queries per year × 3s minimum = ~9s/year; plus this delay gives ~14s/year,
+    so full warm takes ~5-6 hours.
     """
     years = _prioritised_years()
     filled = 0
@@ -53,13 +56,6 @@ async def warm_cache(delay_seconds: float = 30.0) -> None:
             if get_cached_events(year) is not None:
                 skipped += 1
                 continue
-
-            # If Wikidata has rate-limited us, sleep until the window clears.
-            from clockapp.server.fetcher import _rate_limit_until
-            remaining = _rate_limit_until - __import__("time").time()
-            if remaining > 0:
-                logger.info("Warmer pausing %.0fs for Wikidata rate limit", remaining)
-                await asyncio.sleep(remaining + 1)
 
             loop = asyncio.get_event_loop()
             events = await loop.run_in_executor(None, get_events_for_year, year)
