@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import os
 import sys
+import zoneinfo
 from contextlib import asynccontextmanager
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -167,6 +168,66 @@ def cache_status():
         "cached_years": cached,
         "total_years": total_years,
         "percent_warm": round(cached / total_years * 100, 1),
+    }
+
+
+@router.get("/now")
+def get_now(tz: str | None = None):
+    if tz is not None:
+        try:
+            zone = zoneinfo.ZoneInfo(tz)
+        except (zoneinfo.ZoneInfoNotFoundError, KeyError):
+            raise HTTPException(status_code=400, detail=f"Invalid timezone: {tz}")
+        now = datetime.datetime.now(zone)
+    else:
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+    hour = now.hour
+    minute = now.minute
+    year = hour * 100 + minute
+    day_of_year = now.timetuple().tm_yday
+    time_str = now.strftime("%H:%M")
+
+    is_future = year > settings.current_year
+    context = get_context_for_year(year)
+    eras = get_eras_for_year(year)
+
+    era = eras[0]["name"] if eras else None
+    ongoing = None
+    if len(eras) >= 2 and eras[1]["name"] != era:
+        ongoing = eras[1]["name"]
+
+    if is_future:
+        future_events = get_future_events_for_year(year)
+        if future_events:
+            event_dict = future_events[day_of_year % len(future_events)]
+            event = event_dict.get("text", context)
+            source = event_dict.get("source")
+        else:
+            event = context
+            source = None
+        source_url = None
+    else:
+        events = get_events_for_year(year)
+        if events:
+            event_dict = events[day_of_year % len(events)]
+            event = event_dict.get("text", context)
+            source = "Wikidata"
+            source_url = f"https://www.wikidata.org/wiki/Special:Search?search={year}"
+        else:
+            event = context
+            source = None
+            source_url = None
+
+    return {
+        "time": time_str,
+        "year": year,
+        "event": event,
+        "context": context,
+        "era": era,
+        "ongoing": ongoing,
+        "source": source,
+        "source_url": source_url,
     }
 
 
