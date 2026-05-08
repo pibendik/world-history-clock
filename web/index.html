@@ -380,6 +380,29 @@
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
     }
+    /* ── Reaction buttons ─────────────────────────────────────────────────── */
+    .reaction-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      align-items: center;
+    }
+    .rxn-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 1rem;
+      padding: 0.3rem 0.65rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      line-height: 1;
+      min-height: 36px;
+    }
+    .rxn-btn:hover { border-color: var(--accent); color: var(--text-primary); transform: scale(1.1); }
+    .rxn-btn.saved { color: #f0c040; border-color: #f0c040; }
+    .rxn-btn.disliked { color: #f85149; border-color: #f85149; }
+
   </style>
 </head>
 <body>
@@ -415,6 +438,10 @@
       </div>
       <div class="event-source" id="eventSource"></div>
       <div class="era-context" id="eraContext" hidden></div>
+      <div class="reaction-row" id="reactionRow" hidden>
+        <button class="rxn-btn" id="saveBtn" title="Save this fact">☆</button>
+        <button class="rxn-btn" id="dislikeBtn" title="Skip &amp; hide this event">✕</button>
+      </div>
     </div>
 
     <div class="timeline-bar" id="timelineBar">
@@ -605,6 +632,8 @@
       elSource.innerHTML = '';
       elEraCtx.hidden = true;
       elEraCtx.textContent = '';
+      const row = document.getElementById('reactionRow');
+      if (row) row.hidden = true;
     }
 
     function showEvent(lines, source, sourceUrl, counter = '', displayYear = lastYear) {
@@ -621,6 +650,8 @@
         if (elHeader.textContent !== 'THE FUTURE') {
           elHeader.textContent = elCard.classList.contains('antiquity') ? 'Antiquity Era' : 'Historical Era';
         }
+        currentEventData = null;
+        updateReactionRow(displayYear, null, source, null);
       } else {
         elEvent.classList.remove('era-context-mode');
         const srcHtml = source
@@ -637,6 +668,9 @@
           elEraCtx.hidden = true;
           elEraCtx.textContent = '';
         }
+
+        currentEventData = { year: displayYear, text: lines, source, url: sourceUrl };
+        updateReactionRow(displayYear, lines, source, sourceUrl);
       }
 
       requestAnimationFrame(() => {
@@ -663,7 +697,7 @@
         if (data.future_events && data.future_events.length > 0) {
           yearCache.storeFutureEvents(year, data.future_events);
         }
-        if (events.length > 0) yearCache.store(year, events, 'Wikidata');
+        if (events.length > 0) yearCache.store(year, events, 'Wikipedia');
         return events;
       } catch (_) {
         return [];
@@ -702,10 +736,13 @@
           yearCache.markTried(year);
         }
         if (yearCache.has(year)) {
-          const wikiUrl = `https://www.wikidata.org/wiki/Special:Search?search=${year}`;
+          const wikiUrl = `https://en.wikipedia.org/wiki/${year}`;
           const events = yearCache._cache.get(year)?.events || [];
-          const event = events[daySeededIndex(events)];
-          if (event) return { text: event, source: 'Wikidata', url: wikiUrl };
+          const disliked = getDisliked();
+          const available = events.filter(e => !disliked.has(`${year}::${e}`));
+          const pool = available.length > 0 ? available : events;
+          const event = pool[daySeededIndex(pool)];
+          if (event) return { text: event, source: 'Wikipedia', url: wikiUrl, year };
         }
       } catch (_) {}
       const eraCtx = yearCache.getContext(year);
@@ -900,6 +937,83 @@
         sliderDebounce = setTimeout(() => fetchEvent(year), 300);
       });
     })();
+
+    // ── Reactions & Saves (localStorage) ─────────────────────────────────────
+    const DISLIKED_KEY = 'yearclock_disliked';
+    const SAVED_KEY    = 'yearclock_saved';
+
+    let currentEventData = null; // { year, text, source, url }
+
+    function getDisliked() {
+      try { return new Set(JSON.parse(localStorage.getItem(DISLIKED_KEY) || '[]')); }
+      catch { return new Set(); }
+    }
+
+    function addDisliked(year, text) {
+      const s = getDisliked();
+      s.add(`${year}::${text}`);
+      localStorage.setItem(DISLIKED_KEY, JSON.stringify([...s]));
+    }
+
+    function getSaved() {
+      try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); }
+      catch { return []; }
+    }
+
+    function isSaved(year, text) {
+      return getSaved().some(s => s.key === `${year}::${text}`);
+    }
+
+    function toggleSaved(year, text, source, url) {
+      const key = `${year}::${text}`;
+      const saved = getSaved();
+      const idx = saved.findIndex(s => s.key === key);
+      if (idx >= 0) {
+        saved.splice(idx, 1);
+      } else {
+        saved.unshift({ key, year, text, source, url, savedAt: Date.now() });
+      }
+      localStorage.setItem(SAVED_KEY, JSON.stringify(saved.slice(0, 200)));
+      return idx < 0; // true = now saved
+    }
+
+    function updateReactionRow(year, text, source, url) {
+      const row = document.getElementById('reactionRow');
+      const saveBtn = document.getElementById('saveBtn');
+      const dislikeBtn = document.getElementById('dislikeBtn');
+      if (!row || !saveBtn || !dislikeBtn) return;
+      if (!text || source === 'Era context') { row.hidden = true; return; }
+      row.hidden = false;
+      const saved = isSaved(year, text);
+      saveBtn.textContent = saved ? '★' : '☆';
+      saveBtn.classList.toggle('saved', saved);
+      dislikeBtn.classList.remove('disliked');
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      if (!currentEventData) return;
+      const { year, text, source, url } = currentEventData;
+      const nowSaved = toggleSaved(year, text, source, url);
+      const btn = document.getElementById('saveBtn');
+      btn.textContent = nowSaved ? '★' : '☆';
+      btn.classList.toggle('saved', nowSaved);
+      btn.title = nowSaved ? 'Saved! Click to unsave' : 'Save this fact';
+    });
+
+    document.getElementById('dislikeBtn').addEventListener('click', () => {
+      if (!currentEventData) return;
+      const { year, text } = currentEventData;
+      addDisliked(year, text);
+      const btn = document.getElementById('dislikeBtn');
+      btn.classList.add('disliked');
+      // Invalidate eventBuffer for this year so next view picks a fresh event
+      eventBuffer._store.delete(year);
+      // Re-fetch immediately if we're viewing this year
+      const viewYear = viewingYear !== null ? viewingYear : lastYear;
+      if (viewYear === year) {
+        setTimeout(() => fetchEvent(year), 180);
+      }
+    });
 
     updateNavStatus();
     tick();
