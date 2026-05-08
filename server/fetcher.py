@@ -284,7 +284,14 @@ def fetch_wikidata_events(year: int) -> list[str]:
     """
     Fetch events: try Wikipedia first (fast and reliable), then fall back to
     Wikidata SPARQL (slower, may be rate-limited).
+
+    If there is no Wikipedia article for this year (year ≤ 0 or > 2100), skip
+    SPARQL too — those queries reliably time out and era context handles it.
     """
+    title = _wikipedia_article_title(year)
+    if not title:
+        return []
+
     labels = fetch_wikipedia_events(year)
     if not labels:
         # Wikidata SPARQL fallback — slower but covers gaps (e.g., births/deaths)
