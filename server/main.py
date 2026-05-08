@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,15 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from clockapp.data.epochs import format_era_display, get_context_for_year, get_eras_for_year, get_future_events_for_year
-from clockapp.server.db import (
-    get_era_exposure,
-    get_reactions,
-    get_saved,
-    increment_era_exposure,
-    remove_saved,
-    save_fact,
-    set_reaction,
-)
+from clockapp.server.db import increment_era_exposure
 from clockapp.server.config import settings
 from clockapp.server.db import get_db
 from clockapp.server.fetcher import get_events_for_year
@@ -53,21 +44,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# ── Pydantic models ────────────────────────────────────────────────────────────
-
-class ReactionBody(BaseModel):
-    year: int
-    text: str
-    source: str | None = None
-    reaction: str  # 'like' or 'dislike'
-
-
-class SaveBody(BaseModel):
-    year: int
-    text: str
-    source: str | None = None
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -147,41 +123,6 @@ def get_year(year: int):
 @router.get("/year/{year}/buffer")
 def get_year_buffer(year: int, window: int = 2):
     return {y: _build_year_data(y) for y in range(year - window, year + window + 1)}
-
-
-@router.post("/reaction", status_code=201)
-def post_reaction(body: ReactionBody):
-    if body.reaction not in ("like", "dislike"):
-        raise HTTPException(status_code=422, detail="reaction must be 'like' or 'dislike'")
-    set_reaction(body.year, body.text, body.source, body.reaction)
-    return {"status": "ok"}
-
-
-@router.get("/reactions")
-def list_reactions():
-    return get_reactions()
-
-
-@router.get("/saved")
-def list_saved():
-    return get_saved()
-
-
-@router.post("/saved", status_code=201)
-def post_saved(body: SaveBody):
-    save_fact(body.year, body.text, body.source)
-    return {"status": "ok"}
-
-
-@router.delete("/saved/{key}")
-def delete_saved(key: str):
-    remove_saved(key)
-    return {"status": "ok"}
-
-
-@router.get("/eras")
-def list_eras():
-    return get_era_exposure()
 
 
 @router.delete("/cache")
