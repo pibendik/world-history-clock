@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 import urllib.parse
 
 import requests
@@ -11,6 +12,11 @@ from clockapp.server.db import get_cached_events, store_events
 from clockapp.server.scorer import score_events
 
 logger = logging.getLogger(__name__)
+
+# Module-level rate-limit tracker. When Wikidata returns 429, we record the
+# earliest time we're allowed to try again. All _run_query calls check this
+# before hitting the network so we don't hammer a rate-limited endpoint.
+_rate_limit_until: float = 0.0
 
 # ---------------------------------------------------------------------------
 # SPARQL-level exclusions — stop boring types from consuming LIMIT slots
@@ -149,10 +155,24 @@ def _is_interesting_label(label: str) -> bool:
 
 
 def _run_query(template: str, year: int) -> list[str]:
+    global _rate_limit_until
+    now = time.time()
+    if now < _rate_limit_until:
+        wait = int(_rate_limit_until - now)
+        logger.debug("Skipping SPARQL for year %d — rate-limited for %ds more", year, wait)
+        return []
     try:
         query = template.replace("{year}", str(year)).strip()
         url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = requests.get(url, headers=HEADERS, timeout=20)
+        if resp.status_code == 429:
+            retry_after = int(resp.headers.get("Retry-After", 120))
+            _rate_limit_until = time.time() + retry_after
+            logger.warning(
+                "Wikidata rate limited (429) for year %d — pausing %ds",
+                year, retry_after,
+            )
+            return []
         if not resp.ok:
             logger.warning("SPARQL HTTP %s for year %d: %s", resp.status_code, year, resp.text[:200])
             return []

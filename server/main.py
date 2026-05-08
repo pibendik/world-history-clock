@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
         settings.llm_scoring_enabled,
         settings.openai_api_key is not None,
     )
-    asyncio.create_task(warm_cache(delay_seconds=5.0))
+    asyncio.create_task(warm_cache())
     asyncio.create_task(daily_refresh())
     yield
 
