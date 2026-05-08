@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yearclock-v8';
+const CACHE_NAME = 'yearclock-v9';
 const STATIC_ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', event => {

@@ -653,114 +653,21 @@
       });
     }
 
-    async function fetchWikidataDirect(year) {
-      const Q_CODE = /^Q\d+$/;
-      const BORING_PATTERNS = [
-        /^.+ at the \d{4} (Summer|Winter) Olympics?$/i,
-        /^.+ at the \d{4} (Summer|Winter) Paralympic Games?$/i,
-        /^.+ at the \d{4} (Summer|Winter) Youth Olympics?$/i,
-        /^.+ at the \d{4} Commonwealth Games?$/i,
-        /^.+ at the \d{4} (FIFA|UEFA|FIBA|IAAF|UCI|IIHF)/i,
-        /^\d{4}[-–]\d{2,4} .*(season|league|championship|cup)$/i,
-        /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/i,
-        /^\d{4} in /i,
-        /one-year-period/i,
-        /^\d{3,4}[-–]\d{2,4}$/,
-        /^(Solar|Lunar) eclipse of /i,
-        /^Transit of (Mercury|Venus|Mars)/i,
-        /^Occultation of /i,
-        /^(Annular|Total|Partial|Hybrid) (solar|lunar) eclipse/i,
-        /^NGC \d+/i,
-        /^IC \d+$/i,
-        /^(Messier|M) \d+$/i,
-        /^\(\d{2,}\) \w/,
-        /\bmain.belt asteroid\b/i,
-        /\bnear.Earth (asteroid|object)\b/i,
-        /\bSocket \d+\b/i,
-        /^Category:/i,
-        /^SCP-\d+/i,
-        /reserved for private use/i,
-        /^\d+$/,
-      ];
-      const isInteresting = (label) => {
-        if (!label) return false;
-        if (Q_CODE.test(label)) return false;
-        if (!label.includes(' ')) return false;
-        if (label.trim().length < 20) return false;
-        return !BORING_PATTERNS.some(p => p.test(label));
-      };
-
-      const P31_EXCL = [
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q13406463. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q14204246. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q21199. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q4167836. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q17633526. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q3863. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q61788250. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q188025. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q3234690. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q645883. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q107024. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q1151284. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q523. }',
-        'FILTER NOT EXISTS { ?event wdt:P31 wd:Q318. }',
-      ].join('\n  ');
-
-      const runQuery = async (sparql) => {
-        const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
-        const resp = await fetch(url, { headers: { Accept: 'application/sparql-results+json' } });
-        if (!resp.ok) return [];
-        const data = await resp.json();
-        return data.results.bindings
-          .map(b => b.eventLabel?.value)
-          .filter(isInteresting);
-      };
-
-      const q1 = `SELECT DISTINCT ?eventLabel WHERE {
-  ?event wdt:P585 ?date.
-  FILTER(YEAR(?date) = ${year})
-  ${P31_EXCL}
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-} LIMIT 20`;
-
-      const q2 = `SELECT DISTINCT ?eventLabel WHERE {
-  ?event wdt:P571 ?date.
-  FILTER(YEAR(?date) = ${year})
-  ${P31_EXCL}
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-} LIMIT 15`;
-
-      const [labels1, labels2] = await Promise.all([runQuery(q1), runQuery(q2)]);
-      const seen = new Set();
-      const combined = [];
-      for (const label of [...labels1, ...labels2]) {
-        if (!seen.has(label)) { seen.add(label); combined.push(label); }
-      }
-      if (combined.length === 0) throw new Error('No results');
-      yearCache.store(year, combined, 'Wikidata');
-      return combined;
-    }
-
-    async function fetchWikidata(year) {
+    async function fetchFromAPI(year) {
       try {
         const resp = await fetch(`${API_URL}/year/${year}`, { signal: AbortSignal.timeout(30000) });
-        if (resp.ok) {
-          const data = await resp.json();
-          const events = (data.events || []).map(e => e.text || e).filter(Boolean);
-          if (data.context) yearCache.storeContext(year, data.context);
-          if (data.future_events && data.future_events.length > 0) {
-            yearCache.storeFutureEvents(year, data.future_events);
-          }
-          if (events.length > 0) {
-            yearCache.store(year, events, 'API');
-          }
-          return events;
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        const events = (data.events || []).map(e => e.text || e).filter(Boolean);
+        if (data.context) yearCache.storeContext(year, data.context);
+        if (data.future_events && data.future_events.length > 0) {
+          yearCache.storeFutureEvents(year, data.future_events);
         }
+        if (events.length > 0) yearCache.store(year, events, 'Wikidata');
+        return events;
       } catch (_) {
-        // Backend unreachable — fall through to direct Wikidata
+        return [];
       }
-      return await fetchWikidataDirect(year);
     }
 
     // Date-seeded index: rotates through events by day-of-year so each day shows
@@ -774,7 +681,7 @@
       if (year > CURRENT_YEAR) {
         if (!yearCache.hasTried(year)) {
           yearCache.markTried(year);
-          await fetchWikidata(year).catch(() => {});
+          await fetchFromAPI(year).catch(() => {});
         }
         if (yearCache.hasFutureEvents(year)) {
           const ev = yearCache.getNextFutureEvent(year);
@@ -791,7 +698,7 @@
       }
       try {
         if (!yearCache.has(year) && !yearCache.hasTried(year)) {
-          await fetchWikidata(year);
+          await fetchFromAPI(year);
           yearCache.markTried(year);
         }
         if (yearCache.has(year)) {
