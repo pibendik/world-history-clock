@@ -83,6 +83,29 @@ clockapp/
 
 ---
 
+## API
+
+The backend exposes a simple public API. No authentication required.
+
+**Current moment (what the clock shows right now):**
+```bash
+curl https://historieklokka.no/api/v1/now | jq .
+```
+
+**A specific year:**
+```bash
+curl https://historieklokka.no/api/v1/year/1969 | jq .
+```
+
+**Diagnostic — check if LLM scoring is active:**
+```bash
+curl https://historieklokka.no/api/v1/scorer/status | jq .
+```
+
+Full API docs: [https://historieklokka.no/docs](https://historieklokka.no/docs)
+
+---
+
 ## Running Locally
 
 **Prerequisites:** Docker + Docker Compose

@@ -147,7 +147,7 @@ def _is_interesting_label(label: str) -> bool:
 
 def _run_query(template: str, year: int) -> list[str]:
     try:
-        query = template.format(year=year).strip()
+        query = template.replace("{year}", str(year)).strip()
         url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
         resp = requests.get(url, headers=HEADERS, timeout=10)
         if not resp.ok:
