@@ -178,38 +178,139 @@ def _run_query(template: str, year: int) -> list[str]:
             return []
 
 
+def _wikipedia_article_title(year: int) -> str | None:
+    """Return the Wikipedia article title for a year, or None if out of range."""
+    if year > 2100 or year < -800:
+        return None
+    if year <= 0:
+        return f"{abs(year)} BC"
+    if year < 1000:
+        return f"{year} AD"
+    return str(year)
+
+
+_WIKITEXT_LINK_RE = re.compile(r'\[\[(?:[^|\]]*\|)?([^\]]+)\]\]')
+_WIKITEXT_TEMPLATE_RE = re.compile(r'\{\{[^{}]*\}\}')
+_WIKITEXT_REF_RE = re.compile(r'<ref[^>]*/?>.*?</ref>|<ref[^/][^>]*/>', re.DOTALL)
+_WIKITEXT_TAG_RE = re.compile(r'<[^>]+>')
+_WIKITEXT_BOLD_RE = re.compile(r"'''?")
+_DATE_PREFIX_RE = re.compile(r'^.*?(?:\d{1,2})\s*[–\-&ndash;]+\s*', re.DOTALL)
+
+
+def _clean_wikitext(text: str) -> str:
+    """Strip wiki markup and return plain text."""
+    text = _WIKITEXT_REF_RE.sub('', text)
+    text = _WIKITEXT_LINK_RE.sub(r'\1', text)
+    # Remove templates iteratively (nested templates)
+    for _ in range(5):
+        text, n = _WIKITEXT_TEMPLATE_RE.subn('', text)
+        if n == 0:
+            break
+    text = _WIKITEXT_TAG_RE.sub('', text)
+    text = _WIKITEXT_BOLD_RE.sub('', text)
+    text = text.replace('&ndash;', '–').replace('&mdash;', '—').replace('&amp;', '&')
+    # Remove leading date prefix like "January 4 –"
+    text = re.sub(r'^(?:[A-Z][a-z]+ \d{1,2}\s*)?[–\-]+\s*', '', text)
+    return text.strip().strip('.')
+
+
+def fetch_wikipedia_events(year: int) -> list[str]:
+    """
+    Fetch events from Wikipedia's year article.
+    Returns a list of plain-text event strings.
+    Works for years roughly -800 to 2100; returns [] for out-of-range or sparse years.
+    """
+    title = _wikipedia_article_title(year)
+    if not title:
+        return []
+
+    try:
+        # Step 1: get section list to find Events section index
+        sections_resp = requests.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={"action": "parse", "page": title, "prop": "sections", "format": "json"},
+            headers=HEADERS,
+            timeout=8,
+        )
+        if not sections_resp.ok:
+            return []
+        sections_data = sections_resp.json().get("parse", {})
+        if not sections_data:
+            return []
+
+        sections = sections_data.get("sections", [])
+        # Find the Events section (section 1 in most year articles)
+        events_section = next(
+            (s for s in sections if s.get("line", "").lower() in ("events", "events and trends")),
+            sections[0] if sections else None,
+        )
+        if not events_section:
+            return []
+
+        section_index = events_section["index"]
+
+        # Step 2: get wikitext for that section
+        wikitext_resp = requests.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={
+                "action": "parse",
+                "page": title,
+                "prop": "wikitext",
+                "section": section_index,
+                "format": "json",
+            },
+            headers=HEADERS,
+            timeout=8,
+        )
+        if not wikitext_resp.ok:
+            return []
+
+        wikitext = wikitext_resp.json().get("parse", {}).get("wikitext", {}).get("*", "")
+        bullets = re.findall(r'^\*+\s*(.+)$', wikitext, re.MULTILINE)
+
+        events: list[str] = []
+        for b in bullets:
+            clean = _clean_wikitext(b)
+            if _is_interesting_label(clean):
+                events.append(clean[:250])
+
+        logger.debug("Wikipedia: year %d → %d events from section %s", year, len(events), section_index)
+        return events[:25]
+
+    except (requests.RequestException, ValueError, KeyError, StopIteration) as exc:
+        logger.warning("Wikipedia fetch failed for year %d: %s", year, exc)
+        return []
+
+
 def fetch_wikidata_events(year: int) -> list[str]:
     """
-    Run three SPARQL queries, deduplicate, and filter uninteresting labels.
-    Query order determines display priority:
-      1. P585 (point in time) — actual events, discoveries, battles, etc.
-      2. Notable humans (births/deaths) — almost always interesting
-      3. P571 (inception) — institutions, buildings, organisations founded
-
-    For years after 1850, the humans query requires >= 20 sitelinks
-    (cross-language Wikipedia presence as a notability proxy) to avoid
-    minor local figures swamping the results for data-rich modern years.
+    Fetch events: try Wikipedia first (fast and reliable), then fall back to
+    Wikidata SPARQL (slower, may be rate-limited).
     """
-    humans_template = SPARQL_HUMANS_MODERN if year > 1850 else SPARQL_HUMANS
-    labels1 = _run_query(SPARQL_P585, year)
-    labels2 = _run_query(humans_template, year)
-    labels3 = _run_query(SPARQL_P571, year)
-    seen: set[str] = set()
-    combined: list[str] = []
-    for label in labels1 + labels2 + labels3:
-        if label not in seen:
-            seen.add(label)
-            combined.append(label)
-    return score_events(year, combined)
+    labels = fetch_wikipedia_events(year)
+    if not labels:
+        # Wikidata SPARQL fallback — slower but covers gaps (e.g., births/deaths)
+        humans_template = SPARQL_HUMANS_MODERN if year > 1850 else SPARQL_HUMANS
+        labels1 = _run_query(SPARQL_P585, year)
+        labels2 = _run_query(humans_template, year)
+        labels3 = _run_query(SPARQL_P571, year)
+        seen: set[str] = set()
+        labels = []
+        for label in labels1 + labels2 + labels3:
+            if label not in seen:
+                seen.add(label)
+                labels.append(label)
+    return score_events(year, labels)
 
 
 def get_events_for_year(year: int) -> list[dict]:
-    """Return cached events or fetch from Wikidata. Returns list of {text, source} dicts."""
+    """Return cached events or fetch (Wikipedia first, Wikidata SPARQL fallback).
+    Returns list of {text, source} dicts."""
     cached = get_cached_events(year)
     if cached is not None:
         return cached
     labels = fetch_wikidata_events(year)
-    events = [{"text": t, "source": "Wikidata"} for t in labels]
+    events = [{"text": t, "source": "Wikipedia"} for t in labels]
     if events:
         store_events(year, events)
     return events
