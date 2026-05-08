@@ -17,15 +17,3 @@ def mock_eras(monkeypatch):
     """Patch _load_eras() to return a controlled era list without touching the filesystem."""
     import clockapp.data.epochs as epochs_module
     monkeypatch.setattr(epochs_module, "_load_eras", lambda: SAMPLE_ERAS)
-
-
-@pytest.fixture(autouse=True)
-def reset_fetcher_rate_state():
-    """Reset module-level timing/rate-limit state in fetcher before each test.
-    Without this, the 3s inter-query gap causes test suites to take minutes."""
-    import clockapp.server.fetcher as fetcher
-    fetcher._last_query_time = 0.0
-    fetcher._rate_limit_until = 0.0
-    yield
-    fetcher._last_query_time = 0.0
-    fetcher._rate_limit_until = 0.0

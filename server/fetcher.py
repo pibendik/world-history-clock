@@ -1,10 +1,7 @@
-"""Wikidata fetching logic, adapted from clock.py."""
+"""Event fetching logic for the YearClock API."""
 
 import logging
 import re
-import threading
-import time
-import urllib.parse
 
 import requests
 
@@ -14,23 +11,10 @@ from clockapp.server.scorer import score_events
 
 logger = logging.getLogger(__name__)
 
-# Serialize ALL outbound SPARQL requests so only one is in-flight at a time.
-# Without this, the warmer thread + concurrent user requests all pile up on
-# Wikidata simultaneously, causing cascading 429s and ReadTimeouts.
-_sparql_lock = threading.Lock()
-
-# Minimum seconds to wait between queries — even when Wikidata isn't complaining.
-_MIN_QUERY_INTERVAL = 3.0
-_last_query_time: float = 0.0
-
-# When Wikidata returns 429, record when we're allowed to try again.
-_rate_limit_until: float = 0.0
-
 # ---------------------------------------------------------------------------
-# SPARQL query templates — kept as lean as possible.
-# All heavyweight filtering is done in Python post-processing (_is_interesting_label).
-# The SPARQL FILTER NOT EXISTS clauses were removed because they made queries
-# too expensive for Wikidata's public endpoint (25+ second response times).
+# SPARQL query template — kept only for the /api/v1/debug/sparql diagnostic
+# endpoint. SPARQL is no longer used for production event fetching; it reliably
+# times out (30s+) on Wikidata's public endpoint for year-filtered queries.
 # ---------------------------------------------------------------------------
 
 SPARQL_P585 = (
@@ -39,39 +23,6 @@ SPARQL_P585 = (
     "  FILTER(YEAR(?date) = {year})\n"
     "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
     "} LIMIT 30"
-)
-
-SPARQL_P571 = (
-    "SELECT DISTINCT ?event ?eventLabel WHERE {\n"
-    "  ?event wdt:P571 ?date.\n"
-    "  FILTER(YEAR(?date) = {year})\n"
-    "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
-    "} LIMIT 20"
-)
-
-# Dedicated query for notable humans — births AND deaths in the year.
-# For recent years (post-1850) add a sitelinks floor to prefer globally
-# notable people over obscure local figures.
-SPARQL_HUMANS_MODERN = (
-    "SELECT DISTINCT ?event ?eventLabel WHERE {\n"
-    "  { ?event wdt:P569 ?date. } UNION { ?event wdt:P570 ?date. }\n"
-    "  FILTER(YEAR(?date) = {year})\n"
-    "  ?event wdt:P31 wd:Q5.\n"
-    "  ?event wikibase:sitelinks ?links.\n"
-    "  FILTER(?links >= 20)\n"
-    "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
-    "} ORDER BY DESC(?links) LIMIT 15"
-)
-
-SPARQL_HUMANS = (
-    "SELECT DISTINCT ?event ?eventLabel WHERE {\n"
-    "  { ?event wdt:P569 ?date. } UNION { ?event wdt:P570 ?date. }\n"
-    "  FILTER(YEAR(?date) = {year})\n"
-    "  ?event wdt:P31 wd:Q5.\n"
-    "  ?event wikibase:sitelinks ?links.\n"
-    "  FILTER(?links >= 5)\n"
-    "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
-    "} ORDER BY DESC(?links) LIMIT 15"
 )
 
 HEADERS = {"User-Agent": "YearClock/1.0 (educational project; historieklokka.no)"}
@@ -137,45 +88,6 @@ def _is_interesting_label(label: str) -> bool:
     if any(p.search(label) for p in _BORING_PATTERNS):
         return False
     return True
-
-
-def _run_query(template: str, year: int) -> list[str]:
-    global _rate_limit_until, _last_query_time
-    with _sparql_lock:
-        now = time.time()
-        if now < _rate_limit_until:
-            wait = int(_rate_limit_until - now)
-            logger.debug("Skipping SPARQL for year %d — rate-limited for %ds more", year, wait)
-            return []
-        # Enforce minimum spacing — avoids pileup even without a 429.
-        gap = _MIN_QUERY_INTERVAL - (now - _last_query_time)
-        if gap > 0:
-            time.sleep(gap)
-        _last_query_time = time.time()
-        try:
-            query = template.replace("{year}", str(year)).strip()
-            url = f"{settings.sparql_endpoint}?format=json&query={urllib.parse.quote(query)}"
-            resp = requests.get(url, headers=HEADERS, timeout=30)
-            if resp.status_code == 429:
-                retry_after = int(resp.headers.get("Retry-After", 120))
-                _rate_limit_until = time.time() + retry_after
-                logger.warning(
-                    "Wikidata rate limited (429) for year %d — pausing %ds",
-                    year, retry_after,
-                )
-                return []
-            if not resp.ok:
-                logger.warning("SPARQL HTTP %s for year %d: %s", resp.status_code, year, resp.text[:200])
-                return []
-            bindings = resp.json().get("results", {}).get("bindings", [])
-            return [
-                b["eventLabel"]["value"]
-                for b in bindings
-                if "eventLabel" in b and _is_interesting_label(b["eventLabel"]["value"])
-            ]
-        except (requests.RequestException, ValueError, KeyError) as exc:
-            logger.warning("SPARQL query failed for year %d: %s: %s", year, type(exc).__name__, exc)
-            return []
 
 
 def _wikipedia_article_title(year: int) -> str | None:
@@ -282,34 +194,23 @@ def fetch_wikipedia_events(year: int) -> list[str]:
 
 def fetch_wikidata_events(year: int) -> list[str]:
     """
-    Fetch events: try Wikipedia first (fast and reliable), then fall back to
-    Wikidata SPARQL (slower, may be rate-limited).
+    Fetch events from Wikipedia's year article.
+    Returns scored/filtered event strings, or [] if no article exists.
 
-    If there is no Wikipedia article for this year (year ≤ 0 or > 2100), skip
-    SPARQL too — those queries reliably time out and era context handles it.
+    Wikidata SPARQL is no longer used — it reliably times out (30s+) for
+    year-filtered queries regardless of rate limiting. Era context handles
+    sparse/missing years gracefully.
     """
     title = _wikipedia_article_title(year)
     if not title:
         return []
 
     labels = fetch_wikipedia_events(year)
-    if not labels:
-        # Wikidata SPARQL fallback — slower but covers gaps (e.g., births/deaths)
-        humans_template = SPARQL_HUMANS_MODERN if year > 1850 else SPARQL_HUMANS
-        labels1 = _run_query(SPARQL_P585, year)
-        labels2 = _run_query(humans_template, year)
-        labels3 = _run_query(SPARQL_P571, year)
-        seen: set[str] = set()
-        labels = []
-        for label in labels1 + labels2 + labels3:
-            if label not in seen:
-                seen.add(label)
-                labels.append(label)
     return score_events(year, labels)
 
 
 def get_events_for_year(year: int) -> list[dict]:
-    """Return cached events or fetch (Wikipedia first, Wikidata SPARQL fallback).
+    """Return cached events or fetch from Wikipedia.
     Returns list of {text, source} dicts."""
     cached = get_cached_events(year)
     if cached is not None:
