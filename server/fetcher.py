@@ -63,39 +63,39 @@ SELECT DISTINCT ?eventLabel WHERE {{
 }} LIMIT 20
 """.format(exclusions=_P31_EXCLUSIONS).replace("{{year}}", "{year}")
 
-SPARQL_P571 = """
-SELECT DISTINCT ?eventLabel WHERE {{
-  ?event wdt:P571 ?date.
-  FILTER(YEAR(?date) = {{year}})
-  {exclusions}
-  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-}} LIMIT 15
-""".format(exclusions=_P31_EXCLUSIONS).replace("{{year}}", "{year}")
+SPARQL_P571 = (
+    "SELECT DISTINCT ?eventLabel WHERE {\n"
+    "  ?event wdt:P571 ?date.\n"
+    "  FILTER(YEAR(?date) = {year})\n"
+    + "\n".join(f"  {f}" for f in _P31_EXCLUSIONS.split("\n") if f.strip()) + "\n"
+    "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
+    "} LIMIT 15"
+)
 
 # Dedicated query for notable humans — births AND deaths in the year.
 # For recent years (post-1850) add a sitelinks floor to prefer globally
 # notable people over obscure local figures.
-SPARQL_HUMANS_MODERN = """
-SELECT DISTINCT ?eventLabel WHERE {{
-  {{ ?event wdt:P569 ?date. }} UNION {{ ?event wdt:P570 ?date. }}
-  FILTER(YEAR(?date) = {{year}})
-  ?event wdt:P31 wd:Q5.
-  ?event wdt:P21 [].
-  ?event wikibase:sitelinks ?links.
-  FILTER(?links >= 20)
-  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-}} ORDER BY DESC(?links) LIMIT 15
-""".replace("{{year}}", "{year}")
+SPARQL_HUMANS_MODERN = (
+    "SELECT DISTINCT ?eventLabel WHERE {\n"
+    "  { ?event wdt:P569 ?date. } UNION { ?event wdt:P570 ?date. }\n"
+    "  FILTER(YEAR(?date) = {year})\n"
+    "  ?event wdt:P31 wd:Q5.\n"
+    "  ?event wdt:P21 [].\n"
+    "  ?event wikibase:sitelinks ?links.\n"
+    "  FILTER(?links >= 20)\n"
+    "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
+    "} ORDER BY DESC(?links) LIMIT 15"
+)
 
-SPARQL_HUMANS = """
-SELECT DISTINCT ?eventLabel WHERE {{
-  {{ ?event wdt:P569 ?date. }} UNION {{ ?event wdt:P570 ?date. }}
-  FILTER(YEAR(?date) = {{year}})
-  ?event wdt:P31 wd:Q5.
-  ?event wdt:P21 [].
-  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-}} LIMIT 15
-""".replace("{{year}}", "{year}")
+SPARQL_HUMANS = (
+    "SELECT DISTINCT ?eventLabel WHERE {\n"
+    "  { ?event wdt:P569 ?date. } UNION { ?event wdt:P570 ?date. }\n"
+    "  FILTER(YEAR(?date) = {year})\n"
+    "  ?event wdt:P31 wd:Q5.\n"
+    "  ?event wdt:P21 [].\n"
+    "  SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". }\n"
+    "} LIMIT 15"
+)
 
 HEADERS = {"User-Agent": "YearClock/1.0 (educational project; historieklokka.no)"}
 
