@@ -102,10 +102,11 @@ async def rescore_cache() -> None:
     for year, events in entries:
         try:
             labels = [e["text"] for e in events]
-            filtered = score_events(year, labels)
-            if len(filtered) < len(labels):
+            filtered_set = set(score_events(year, labels))
+            if len(filtered_set) < len(labels):
                 from clockapp.server.db import store_events
-                store_events(year, [{"text": t, "source": "Wikidata"} for t in filtered])
+                filtered_events = [e for e in events if e["text"] in filtered_set]
+                store_events(year, filtered_events)
                 rescored += 1
         except Exception as exc:
             logger.warning("Rescore failed for year %d: %s", year, exc)

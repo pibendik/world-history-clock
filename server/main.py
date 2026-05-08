@@ -242,8 +242,12 @@ def get_now(tz: str | None = None):
         if events:
             event_dict = events[day_of_year % len(events)]
             event = event_dict.get("text", context)
-            source = "Wikidata"
-            source_url = f"https://www.wikidata.org/wiki/Special:Search?search={year}"
+            source = event_dict.get("source", "Wikipedia")
+            source_url = (
+                f"https://en.wikipedia.org/wiki/{year}"
+                if source == "Wikipedia"
+                else f"https://www.wikidata.org/wiki/Special:Search?search={year}"
+            )
         else:
             event = context
             source = None
