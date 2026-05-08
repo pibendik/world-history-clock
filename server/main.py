@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import logging
 import os
 import sys
 import zoneinfo
@@ -10,6 +11,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 from clockapp.data.epochs import format_era_display, get_context_for_year, get_eras_for_year, get_future_events_for_year
 from clockapp.server.db import (
@@ -29,6 +36,11 @@ from clockapp.server.warmer import daily_refresh, warm_cache
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info(
+        "YearClock starting — LLM scoring: %s, OpenAI key set: %s",
+        settings.llm_scoring_enabled,
+        settings.openai_api_key is not None,
+    )
     asyncio.create_task(warm_cache(delay_seconds=5.0))
     asyncio.create_task(daily_refresh())
     yield
@@ -90,6 +102,41 @@ router = APIRouter(prefix="/api/v1")
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "1.0"}
+
+
+@app.get("/api/v1/scorer/status")
+def scorer_status():
+    """Diagnostic endpoint — shows LLM scorer configuration without revealing secrets."""
+    return {
+        "llm_scoring_enabled": settings.llm_scoring_enabled,
+        "openai_key_set": settings.openai_api_key is not None,
+        "openai_key_prefix": (settings.openai_api_key[:8] + "...") if settings.openai_api_key else None,
+        "model": "gpt-4o-mini",
+    }
+
+
+@app.get("/api/v1/scorer/test")
+def scorer_test():
+    """Diagnostic endpoint — immediately attempts one LLM scoring call with sample data.
+    Use this to verify the OpenAI key and network connectivity from the server."""
+    from clockapp.server.scorer import score_events
+    sample = [
+        "Pope Leo IX begins his pontificate",
+        "Solar eclipse of March 29",
+        "FIFA World Cup season 1033",
+        "Battle of Hastings precursor skirmish",
+    ]
+    try:
+        result = score_events(1033, sample)
+        return {
+            "status": "ok",
+            "input_count": len(sample),
+            "output_count": len(result),
+            "scorer_ran": result != sample,
+            "result": result,
+        }
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
 
 
 @router.get("/year/{year}")
