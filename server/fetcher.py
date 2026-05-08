@@ -180,10 +180,8 @@ def _run_query(template: str, year: int) -> list[str]:
 
 def _wikipedia_article_title(year: int) -> str | None:
     """Return the Wikipedia article title for a year, or None if out of range."""
-    if year > 2100 or year < -800:
+    if year <= 0 or year > 2100:
         return None
-    if year <= 0:
-        return f"{abs(year)} BC"
     if year < 1000:
         return f"{year} AD"
     return str(year)
