@@ -31,16 +31,15 @@ def _prioritised_years() -> list[int]:
     return all_years[start:] + all_years[:start]
 
 
-async def warm_cache(delay_seconds: float = 5.0) -> None:
+async def warm_cache(delay_seconds: float = 2.0) -> None:
     """
     Warm the cache for all 1440 clock years.
     Skips years already cached. Runs at delay_seconds per year.
     Starts from the current UTC time so today's remaining hours are cached first.
 
-    The real throttle is the threading.Lock in _run_query, which ensures only
-    one SPARQL request is in-flight at a time with at least 3s between queries.
-    Three queries per year × 3s minimum = ~9s/year; plus this delay gives ~14s/year,
-    so full warm takes ~5-6 hours.
+    Primary source is Wikipedia (~1-2s per year); SPARQL is only attempted as a
+    fallback for years with no Wikipedia article and will usually also be skipped.
+    At 2s delay + ~2s fetch = ~4s/year → full warm in ~1.5 hours.
     """
     years = _prioritised_years()
     filled = 0
@@ -123,5 +122,5 @@ async def daily_refresh() -> None:
         )
         await asyncio.sleep(wait)
         logger.info("Daily cache refresh starting")
-        await warm_cache(delay_seconds=5.0)
+        await warm_cache(delay_seconds=2.0)
         await rescore_cache()

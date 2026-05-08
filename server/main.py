@@ -140,6 +140,27 @@ def debug_sparql(year: int = 1969):
         return {"status": "error", "detail": str(exc), "year": year}
 
 
+@app.get("/api/v1/debug/wikipedia")
+def debug_wikipedia(year: int = 1969):
+    """Diagnostic endpoint — fetches events from Wikipedia for the given year.
+    Use this to verify Wikipedia connectivity and wikitext parsing from the server."""
+    from clockapp.server.fetcher import fetch_wikipedia_events, _wikipedia_article_title
+    title = _wikipedia_article_title(year)
+    if not title:
+        return {"status": "skipped", "reason": "no Wikipedia article for this year", "year": year}
+    try:
+        events = fetch_wikipedia_events(year)
+        return {
+            "status": "ok",
+            "year": year,
+            "article_title": title,
+            "event_count": len(events),
+            "events": events[:10],
+        }
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc), "year": year}
+
+
 @router.get("/year/{year}")
 def get_year(year: int):
     return _build_year_data(year)
