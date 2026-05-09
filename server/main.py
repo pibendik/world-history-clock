@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from clockapp.data.epochs import format_era_display, get_context_for_year, get_eras_for_year, get_future_events_for_year
+from clockapp.data.epochs import format_era_display, get_all_eras, get_context_for_year, get_eras_for_year, get_future_events_for_year
 from clockapp.server.db import increment_era_exposure
 from clockapp.server.config import settings
 from clockapp.server.db import get_db
@@ -159,6 +159,15 @@ def debug_wikipedia(year: int = 1969):
         }
     except Exception as exc:
         return {"status": "error", "detail": str(exc), "year": year}
+
+
+@app.get("/api/v1/config")
+def get_config():
+    """Return deployment configuration for the frontend: language and epoch data."""
+    return {
+        "lang": settings.lang,
+        "epochs": get_all_eras(),
+    }
 
 
 @router.get("/year/{year}")

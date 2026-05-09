@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     current_year: int = datetime.date.today().year
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     llm_scoring_enabled: bool = Field(default=False, validation_alias="YEARCLOCK_LLM_SCORING")
+    lang: str = Field(default="en", validation_alias="YEARCLOCK_LANG")
 
 
 settings = Settings()

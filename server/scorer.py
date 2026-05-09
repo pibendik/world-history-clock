@@ -1,15 +1,44 @@
 import json
 import logging
+import os
 
 from clockapp.server.config import settings
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (
-    "You are a content curator for Historieklokka — a Norwegian history clock app that shows "
+_SYSTEM_PROMPT_EN = (
+    "You are a content curator for Historieklokka — a history clock app that shows "
     "one fascinating historical fact per minute. Your job is to select the most interesting events "
     "from a Wikipedia year article and rewrite them as vivid, engaging prose for a general audience."
 )
+
+_SYSTEM_PROMPT_NO = """\
+Du er innholdskurator for Historieklokka — en historieklokkapp som viser én fascinerende historisk \
+hendelse per minutt. Oppgaven din er å velge de mest interessante hendelsene fra en Wikipedia-artikkel \
+og skrive dem om til levende, engasjerende prosa på norsk bokmål.
+
+SPRÅK OG STIL — SVÆRT VIKTIG:
+Skriv på godt, levende østlandsnorsk bokmål. Teksten skal høres ut som noe en norsk forfatter ville \
+ha skrevet — ikke som en oversettelse fra engelsk. Unngå konstruksjoner som like gjerne kunne stått \
+i en engelsk tekst.
+
+Unngå disse typiske oversettelsesfeilene:
+- IKKE: «Dette resulterte i en dramatisk endring» → SKRIV: «Dette snudde opp ned på alt»
+- IKKE: «En rekke hendelser fant sted» → SKRIV: «Det skjedde mye» / «Mye sto på spill»
+- IKKE: «Som et resultat av» → SKRIV: «Og dermed» / «Slik sett» / «Det ble følgen»
+- IKKE: «I løpet av dette året» → SKRIV: «Dette året» / «Da» / «Det var i dette året at»
+- IKKE: «Ble drept i en konflikt» → SKRIV: «falt i kamp» / «ble hugget ned» / «mistet livet»
+- IKKE: «Hadde en betydelig innvirkning på» → SKRIV: «forandret», «preget», «satte spor»
+
+Bruk typisk norsk:
+- Lange sammensatte ord der de passer: «sjøslag», «kongemord», «folkevandring», «maktkamp»
+- «da» som avslutningspartikel: «Det var jo ikke tilfeldig, da.»
+- «jo» som selvfølgelighetsmarkør: «Det var jo nettopp slik at…»
+- «vel» som modererende partikel: «Det var vel ingen overraskelse…»
+- Setningsstrukturer med verbal tidlig: «Da kongen falt, ble riket delt.»
+- «man» heller enn «du» i generelle utsagn: «Man kan jo lure på…»
+- Fortellerstemme, som en klok onkel som holder foredrag — engasjert, litt tørr, ikke høytidelig\
+"""
 
 _USER_TEMPLATE = """\
 Year: {year}
@@ -40,6 +69,8 @@ def score_events(year: int, labels: list[str]) -> list[dict]:
     if not labels:
         return []
 
+    system_prompt = _SYSTEM_PROMPT_NO if settings.lang == "no" else _SYSTEM_PROMPT_EN
+
     try:
         from openai import OpenAI
 
@@ -47,7 +78,7 @@ def score_events(year: int, labels: list[str]) -> list[dict]:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
                     "content": _USER_TEMPLATE.format(

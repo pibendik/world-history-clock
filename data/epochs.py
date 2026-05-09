@@ -1,37 +1,56 @@
 import json
+import os
 from pathlib import Path
 
-_DATA_FILE = Path(__file__).parent / "epochs.json"
-_CONTEXT_FILE = Path(__file__).parent / "era_context.json"
-_FUTURE_FILE = Path(__file__).parent / "future_events.json"
+_DATA_DIR = Path(__file__).parent
+
+def _lang() -> str:
+    return os.getenv("YEARCLOCK_LANG", "en")
+
+def _lang_file(base: str) -> Path:
+    """Return language-specific file path, falling back to English if not found."""
+    lang = _lang()
+    if lang != "en":
+        candidate = _DATA_DIR / f"{Path(base).stem}.{lang}{Path(base).suffix}"
+        if candidate.exists():
+            return candidate
+    return _DATA_DIR / base
+
 
 def _load_eras() -> list[dict]:
-    with open(_DATA_FILE, encoding="utf-8") as f:
+    with open(_lang_file("epochs.json"), encoding="utf-8") as f:
         return json.load(f)
 
 
 def _load_context() -> list[dict]:
-    with open(_CONTEXT_FILE, encoding="utf-8") as f:
+    with open(_lang_file("era_context.json"), encoding="utf-8") as f:
         return json.load(f)
 
 
 _future_events_cache: dict | None = None
+_future_events_lang: str | None = None
 
 def _load_future_events() -> dict:
-    global _future_events_cache
-    if _future_events_cache is None:
-        with open(_FUTURE_FILE, encoding="utf-8") as f:
+    global _future_events_cache, _future_events_lang
+    current_lang = _lang()
+    if _future_events_cache is None or _future_events_lang != current_lang:
+        with open(_lang_file("future_events.json"), encoding="utf-8") as f:
             raw = json.load(f)
-        # Exclude the metadata comment key; convert string keys to int
         _future_events_cache = {
             int(k): v for k, v in raw.items() if not k.startswith("_")
         }
+        _future_events_lang = current_lang
     return _future_events_cache
 
 
 def get_future_events_for_year(year: int) -> list[dict]:
     """Return curated future events for a given year, or empty list."""
     return _load_future_events().get(year, [])
+
+
+def get_all_eras() -> list[dict]:
+    """Return all eras (for the /config API endpoint)."""
+    return _load_eras()
 
 
 def get_eras_for_year(year: int) -> list[dict]:
@@ -47,7 +66,6 @@ def get_context_for_year(year: int) -> str | None:
     matching = [e for e in entries if e["from"] <= year <= e["to"]]
     if not matching:
         return None
-    # Prefer the most specific (smallest date span) entry
     best = min(matching, key=lambda e: e["to"] - e["from"])
     return best["text"]
 
