@@ -1,13 +1,12 @@
 {
-  "name": "Historieklokka",
-  "short_name": "Historieklokka",
-  "description": "Kobler klokkeslettet til et år i historien og viser hva som skjedde da.",
+  "name": "What Year Does It Look Like?",
+  "short_name": "Year Clock",
+  "description": "Maps the current time to a year in history and shows what happened then.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "orientation": "portrait",
-  "lang": "nb",
   "icons": [
     {
       "src": "icon-192.png",

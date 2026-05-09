@@ -25,7 +25,6 @@ services:
       - .env
     environment:
       YEARCLOCK_DB_PATH: /data/yearclock.db
-      YEARCLOCK_LANG: "no"
       YEARCLOCK_CORS_ORIGINS: '["https://${YEARCLOCK_DOMAIN}"]'
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8421/health')"]
