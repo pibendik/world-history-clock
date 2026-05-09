@@ -273,6 +273,9 @@ def get_now(tz: str | None = None):
             event = context
             source = None
             source_url = None
+            logger.warning(
+                "No events found for year %d (time=%s) — showing era context fallback", year, time_str
+            )
 
     return {
         "time": time_str,

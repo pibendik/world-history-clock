@@ -91,16 +91,19 @@ class TestCleanWikitext:
 
 class TestFetchWikipediaEvents:
 
-    def _mock_sections_response(self, sections: list) -> MagicMock:
+    def _mock_query_response(self, wikitext: str, pageid: int = 12345) -> MagicMock:
         resp = MagicMock()
         resp.ok = True
-        resp.json.return_value = {"parse": {"sections": sections}}
-        return resp
-
-    def _mock_wikitext_response(self, wikitext: str) -> MagicMock:
-        resp = MagicMock()
-        resp.ok = True
-        resp.json.return_value = {"parse": {"wikitext": {"*": wikitext}}}
+        resp.json.return_value = {
+            "query": {
+                "pages": {
+                    str(pageid): {
+                        "pageid": pageid,
+                        "revisions": [{"slots": {"main": {"*": wikitext}}}],
+                    }
+                }
+            }
+        }
         return resp
 
     def test_returns_empty_for_out_of_range_year(self):
@@ -132,45 +135,56 @@ class TestFetchWikipediaEvents:
         assert result == []
 
     def test_parses_bullet_events_from_wikitext(self):
-        sections = [{"line": "Events", "index": "1"}]
         wikitext = (
             "==Events==\n"
             "* [[Battle of Hastings]] – William the Conqueror defeats Harold\n"
             "* Another significant event occurred in this year\n"
         )
-        sections_resp = self._mock_sections_response(sections)
-        wikitext_resp = self._mock_wikitext_response(wikitext)
-        with patch(
-            "clockapp.server.fetcher.requests.get",
-            side_effect=[sections_resp, wikitext_resp],
-        ):
+        mock_resp = self._mock_query_response(wikitext)
+        with patch("clockapp.server.fetcher.requests.get", return_value=mock_resp):
             result = fetch_wikipedia_events(1066)
         assert len(result) >= 1
         assert any("William the Conqueror" in e or "Battle of Hastings" in e for e in result)
 
     def test_returns_empty_when_no_events_section(self):
-        sections = [{"line": "Deaths", "index": "2"}, {"line": "Births", "index": "3"}]
-        wikitext = "* Some death entry that is long enough to pass\n"
-        sections_resp = self._mock_sections_response(sections)
-        wikitext_resp = self._mock_wikitext_response(wikitext)
-        with patch(
-            "clockapp.server.fetcher.requests.get",
-            side_effect=[sections_resp, wikitext_resp],
-        ):
+        """If article has no Events section and no bullets, return []."""
+        wikitext = "== Deaths ==\nSome content without bullet points.\n"
+        mock_resp = self._mock_query_response(wikitext)
+        with patch("clockapp.server.fetcher.requests.get", return_value=mock_resp):
             result = fetch_wikipedia_events(1066)
-        # Falls back to first section (Deaths), still processes bullets
         assert isinstance(result, list)
+
+    def test_returns_empty_for_missing_article(self):
+        """pageid -1 means article not found."""
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = {
+            "query": {"pages": {"-1": {"pageid": -1}}}
+        }
+        with patch("clockapp.server.fetcher.requests.get", return_value=resp):
+            result = fetch_wikipedia_events(1066)
+        assert result == []
 
     def test_short_events_excluded(self):
         """Events shorter than 20 chars are filtered by _is_interesting_label."""
-        sections = [{"line": "Events", "index": "1"}]
-        wikitext = "* Short\n* This is a sufficiently long event description that passes filter\n"
-        sections_resp = self._mock_sections_response(sections)
-        wikitext_resp = self._mock_wikitext_response(wikitext)
-        with patch(
-            "clockapp.server.fetcher.requests.get",
-            side_effect=[sections_resp, wikitext_resp],
-        ):
+        wikitext = (
+            "==Events==\n"
+            "* Short\n"
+            "* This is a sufficiently long event description that passes filter\n"
+        )
+        mock_resp = self._mock_query_response(wikitext)
+        with patch("clockapp.server.fetcher.requests.get", return_value=mock_resp):
             result = fetch_wikipedia_events(1969)
         assert "Short" not in result
         assert any("sufficiently long" in e for e in result)
+
+    def test_handles_redirect_articles(self):
+        """Early year articles like '701 AD' redirect to '701' — should still work."""
+        wikitext = (
+            "==Events==\n"
+            "* Battle of Some Place: An important medieval battle was fought here\n"
+        )
+        mock_resp = self._mock_query_response(wikitext)
+        with patch("clockapp.server.fetcher.requests.get", return_value=mock_resp):
+            result = fetch_wikipedia_events(701)
+        assert len(result) >= 1

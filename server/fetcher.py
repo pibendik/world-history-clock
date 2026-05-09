@@ -128,55 +128,57 @@ def fetch_wikipedia_events(year: int) -> list[str]:
     """
     Fetch events from Wikipedia's year article.
     Returns a list of plain-text event strings.
-    Works for years roughly -800 to 2100; returns [] for out-of-range or sparse years.
+    Works for years roughly 1 to 2100; returns [] for out-of-range or sparse years.
+
+    Uses a single API call (action=query with rvprop=content) to fetch full wikitext,
+    then extracts the Events section via regex. This approach correctly handles redirect
+    articles (e.g. "701 AD" → "701") that the deprecated prop=sections API misses.
     """
     title = _wikipedia_article_title(year)
     if not title:
         return []
 
     try:
-        # Step 1: get section list to find Events section index
-        sections_resp = requests.get(
-            "https://en.wikipedia.org/w/api.php",
-            params={"action": "parse", "page": title, "prop": "sections", "format": "json"},
-            headers=HEADERS,
-            timeout=8,
-        )
-        if not sections_resp.ok:
-            return []
-        sections_data = sections_resp.json().get("parse", {})
-        if not sections_data:
-            return []
-
-        sections = sections_data.get("sections", [])
-        # Find the Events section (section 1 in most year articles)
-        events_section = next(
-            (s for s in sections if s.get("line", "").lower() in ("events", "events and trends")),
-            sections[0] if sections else None,
-        )
-        if not events_section:
-            return []
-
-        section_index = events_section["index"]
-
-        # Step 2: get wikitext for that section
-        wikitext_resp = requests.get(
+        resp = requests.get(
             "https://en.wikipedia.org/w/api.php",
             params={
-                "action": "parse",
-                "page": title,
-                "prop": "wikitext",
-                "section": section_index,
+                "action": "query",
+                "prop": "revisions",
+                "rvprop": "content",
+                "rvslots": "main",
+                "titles": title,
+                "redirects": 1,
                 "format": "json",
             },
             headers=HEADERS,
-            timeout=8,
+            timeout=12,
         )
-        if not wikitext_resp.ok:
+        if not resp.ok:
+            logger.warning("Wikipedia HTTP %s for year %d", resp.status_code, year)
             return []
 
-        wikitext = wikitext_resp.json().get("parse", {}).get("wikitext", {}).get("*", "")
-        bullets = re.findall(r'^\*+\s*(.+)$', wikitext, re.MULTILINE)
+        pages = resp.json().get("query", {}).get("pages", {})
+        page = next(iter(pages.values()), {})
+        # -1 pageid means article not found
+        if page.get("pageid", -1) == -1:
+            return []
+        wikitext = (
+            page.get("revisions", [{}])[0]
+            .get("slots", {})
+            .get("main", {})
+            .get("*", "")
+        )
+        if not wikitext:
+            return []
+
+        # Extract the Events section (handles "Events", "Events and trends", etc.)
+        m = re.search(
+            r'==\s*Events(?:\s+and\s+\w+)?\s*==(.+?)(?:^==[^=]|\Z)',
+            wikitext,
+            re.DOTALL | re.MULTILINE,
+        )
+        section = m.group(1) if m else wikitext  # fall back to full text if no section found
+        bullets = re.findall(r'^\*+\s*(.+)$', section, re.MULTILINE)
 
         events: list[str] = []
         for b in bullets:
@@ -184,7 +186,9 @@ def fetch_wikipedia_events(year: int) -> list[str]:
             if _is_interesting_label(clean):
                 events.append(clean[:250])
 
-        logger.debug("Wikipedia: year %d → %d events from section %s", year, len(events), section_index)
+        logger.debug("Wikipedia: year %d → %d events", year, len(events))
+        if not events:
+            logger.info("Wikipedia: year %d — article found but 0 usable events (title=%r)", year, title)
         return events[:25]
 
     except (requests.RequestException, ValueError, KeyError, StopIteration) as exc:
