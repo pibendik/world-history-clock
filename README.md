@@ -6,6 +6,8 @@ A progressive web app (PWA) that maps the current military time to a historical 
 
 **Live at [historieklokka.no](https://historieklokka.no)**
 
+**Primært for norske brukere** — the app is aimed at Norwegian users. UI localization to Norwegian is in progress.
+
 ---
 
 ## How It Works
@@ -18,38 +20,13 @@ A progressive web app (PWA) that maps the current military time to a historical 
 | 20:29 | 2029 | *Future zone — see below* |
 | 23:59 | 2359 | Far future — contextual era text shown |
 
-Each minute, the clock fetches a fact from [Wikidata](https://www.wikidata.org). Facts are cached server-side so subsequent visitors see instant results. An era-context layer adds vivid background sentences ("The Black Death was devastating Europe") for every year on the clock.
+Each minute, the clock fetches a fact from [Wikipedia](https://en.wikipedia.org). Facts are cached server-side so subsequent visitors see instant results. An era-context layer adds vivid background sentences ("The Black Death was devastating Europe") for every year on the clock.
 
 ---
 
 ## The Future Zone (2026–2359)
 
-Once the clock passes **20:26** each day, it enters territory where no one has lived yet. This is one of the most interesting design problems in the app.
-
-### Current approach
-A curated set of **era context sentences** in `data/era_context.json` describes the rough shape of each future period ("Late 21st century — humanity is grappling with climate change and the first permanent off-Earth settlements"). Not great, but honest.
-
-### Planned: three layers of future content
-
-**1. Scheduled real events** *(near future, 2026–2100)*
-- Olympics, planned space missions (lunar base, Mars), major calendar milestones
-- Labeled clearly as planned/projected
-
-**2. Imagined futures from fiction** *(the most interesting layer)*
-The clock already asks "what does this year look like?" — for the future, the answer is: *what did humans imagine it would look like?*
-- `2029` — Skynet becomes self-aware *(Terminator, 1984)*
-- `2049` — Humanoid replicants are ubiquitous *(Blade Runner 2049, 2017)*
-- `2061` — Halley's Comet returns; also the setting of *2061: Odyssey Three* (Arthur C. Clarke)
-- `2063` — Zefram Cochrane makes humanity's first warp flight *(Star Trek: First Contact)*
-- `2112` — The Priests of the Temples of Syrinx control the solar system *(Rush, 2112)*
-- `2293` — Kirk and crew attend the Khitomer Accords *(Star Trek VI)*
-- Displayed with source attribution and a distinct "imagined future" visual style
-
-**3. Astronomical events** *(sparse fallback)*
-Total solar eclipses, planetary conjunctions, Halley's Comet returns — computed from known orbital mechanics. Accurate but used as fallback when nothing more interesting is available for a year.
-
-### Implementation path
-Add `data/future_events.json` — a curated list keyed by year, with `type` (`scheduled` | `fiction` | `astronomy`), `text`, and `source`. The API serves it the same way as Wikidata results; the front-end can style fiction entries differently (e.g. a book icon or italics).
+Once the clock passes **20:26** each day, it enters territory where no one has lived yet. The app handles this with a curated set of future events in `data/future_events.py` covering planned space missions, sci-fi imagined futures, and astronomical milestones — displayed with source attribution and a distinct visual style.
 
 ---
 
@@ -58,20 +35,20 @@ Add `data/future_events.json` — a curated list keyed by year, with `type` (`sc
 ```
 clockapp/
 ├── web/                # PWA front-end (single HTML file + service worker)
-│   ├── index.html
+│   ├── index.html      # ~1000 lines: CSS, HTML, JS — clock + event card + reactions
 │   └── sw.js
 ├── server/             # FastAPI backend
-│   ├── main.py         # API routes
-│   ├── fetcher.py      # Wikidata SPARQL queries + content filtering
-│   ├── warmer.py       # Background cache warmer
-│   ├── scorer.py       # Optional LLM quality scoring (OpenAI)
-│   ├── db.py           # SQLite cache
+│   ├── main.py         # API routes (/now, /year/{year}, /debug/*)
+│   ├── fetcher.py      # Wikipedia event fetching + content filtering
+│   ├── warmer.py       # Background cache warmer (runs nightly 04:00 UTC)
+│   ├── scorer.py       # LLM quality scoring (OpenAI gpt-4o-mini)
+│   ├── db.py           # SQLite: event_cache, reactions, saved_facts, era_exposure
 │   ├── config.py       # Settings (env vars)
 │   └── Dockerfile
 ├── data/
-│   ├── era_context.json    # Vivid context sentences for every clock year
-│   ├── epochs.py           # Era lookup helpers
-│   └── future_events.json  # (planned) Curated future-zone events
+│   ├── epochs.py           # 50+ named eras with date ranges + context sentences
+│   └── future_events.py    # Curated future-zone events (fiction, astronomy, planned)
+├── tests/              # pytest — 50 tests covering fetcher, epochs, year calculation
 ├── _archived/          # Superseded terminal and Flutter versions
 ├── docker-compose.yml          # Local development
 ├── docker-compose.prod.yml     # Production (Caddy + auto-HTTPS)
@@ -97,9 +74,9 @@ curl https://historieklokka.no/api/v1/now | jq .
 curl https://historieklokka.no/api/v1/year/1969 | jq .
 ```
 
-**Diagnostic — check if LLM scoring is active:**
+**Debug — raw Wikipedia events for a year:**
 ```bash
-curl https://historieklokka.no/api/v1/scorer/status | jq .
+curl https://historieklokka.no/api/v1/debug/wikipedia?year=1066 | jq .
 ```
 
 Full API docs: [https://historieklokka.no/docs](https://historieklokka.no/docs)
@@ -131,7 +108,7 @@ Quick deploy after changes:
 ./deploy.sh root@YOUR_SERVER_IP
 ```
 
-Clear the fact cache on deploy (fetches fresh results with latest filters):
+Clear the fact cache on deploy (re-fetches all years with latest filters):
 
 ```bash
 ./deploy.sh root@YOUR_SERVER_IP --clear-cache
@@ -142,18 +119,44 @@ Clear the fact cache on deploy (fetches fresh results with latest filters):
 ## Configuration
 
 Copy `.env.example` to `.env` on the server and fill in your values.  
-See `.env.example` for all available options, including the optional LLM scorer.
+See `.env.example` for all available options, including the LLM scorer (OpenAI).
 
 ---
 
-## Content Quality
+## Content Pipeline
 
-Facts come from Wikidata SPARQL queries with multi-layer filtering:
+Facts come from Wikipedia year articles with a multi-layer pipeline:
 
-1. **SPARQL-level exclusions** — asteroids, eclipses, natural numbers, disambiguation pages filtered out before they consume result slots
-2. **Label filtering** — minimum length, must contain spaces, no bare Q-codes, regex patterns for boring entries
-3. **Notability proxy** — post-1850 results require ≥ 20 Wikipedia sitelinks (cross-language presence)
-4. **LLM scoring** *(optional)* — `gpt-4o-mini` re-ranks and filters results; enable with `OPENAI_API_KEY`
+1. **Wikipedia fetch** — `action=query&prop=revisions` with `redirects=1`; handles early year redirect articles (e.g. "701 AD" → "701"). Events section extracted via regex.
+2. **Label filtering** — minimum length, no bare Q-codes, regex exclusions for sports seasons, astronomical catalog objects, Olympics participation entries, etc.
+3. **LLM scoring** *(requires `OPENAI_API_KEY`)* — `gpt-4o-mini` re-ranks and selects the most interesting events; results stored in SQLite.
+4. **Era-context fallback** — if no events are found for a year (very ancient or very sparse Wikipedia coverage), a vivid era description is shown instead. This is logged as a WARNING.
+
+The cache warmer runs nightly at 04:00 UTC. It starts from the current hour so today's remaining hours are cached within minutes of a fresh deploy. Full warm takes ~1.5 hours (~4s/year including LLM scoring).
+
+---
+
+## Features
+
+- ⏰ **Live clock** — updates every second; year changes every minute
+- 📖 **Historical events** — from Wikipedia, LLM-scored for interest
+- 🕰️ **Era context** — 50+ named historical eras with vivid descriptions
+- ⬅️➡️ **Navigation** — arrow keys, prev/next buttons, timeline slider, click-to-set-time
+- ☆ **Save facts** — bookmark events in localStorage (up to 200)
+- ✕ **Dislike** — skip an event and hide it from future rotation
+- 🔮 **Future zone** — curated events for years 2026–2359
+- 📱 **PWA** — works as a home screen app on Android/iOS
+
+---
+
+## Language / Localization
+
+**Primary audience: Norwegian users.** The app name "historieklokka" is Norwegian ("the history clock").
+
+- UI chrome: currently English → **Norwegian (bokmål) translation is the next priority**
+- Event text: English (from English Wikipedia) — acceptable for now
+- Long-term: Norwegian Wikipedia (`no.wikipedia.org`) for fully Norwegian content
+- English version: planned as a separate domain or language toggle
 
 ---
 
