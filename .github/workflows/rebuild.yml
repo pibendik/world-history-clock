@@ -1,0 +1,25 @@
+name: Monthly rebuild
+
+on:
+  schedule:
+    - cron: "0 4 1 * *"   # 04:00 UTC on the 1st of every month
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+jobs:
+  rebuild:
+    name: Force-rebuild Docker image (base OS patches)
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH rebuild
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /opt/historieklokka
+            git pull --ff-only
+            docker compose -f docker-compose.prod.yml build --no-cache api
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans api
+            docker compose -f docker-compose.prod.yml restart caddy
