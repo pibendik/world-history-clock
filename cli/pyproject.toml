@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "historieklokka"
+version = "0.1.0"
+description = "Historieklokka — historieklokkа i terminalen"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "rich>=13.0",
+    "requests>=2.28",
+]
+
+[project.scripts]
+historieklokka = "historieklokka.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["historieklokka"]

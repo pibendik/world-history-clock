@@ -29,6 +29,11 @@ Unngå disse typiske oversettelsesfeilene:
 - IKKE: «I løpet av dette året» → SKRIV: «Dette året» / «Da» / «Det var i dette året at»
 - IKKE: «Ble drept i en konflikt» → SKRIV: «falt i kamp» / «ble hugget ned» / «mistet livet»
 - IKKE: «Hadde en betydelig innvirkning på» → SKRIV: «forandret», «preget», «satte spor»
+- IKKE: «krever N liv» / «tar N liv» → SKRIV: «N dør» / «N mister livet» / «N omkomne»
+- IKKE: «noe som sårer samfunnet» / «noe som reiser spørsmål» → del opp i egne korte setninger
+- IKKE lang avslutningsfloskel («et mørkt kapittel i nasjonens historie») tedd på slutten av en \
+  allerede fullstendig setning → avslutt heller skarpt, eller gjør floskelsetningen til en selvstendig \
+  påstand: «Det er et mørkt kapittel i landets historie.»
 
 Bruk typisk norsk:
 - Lange sammensatte ord der de passer: «sjøslag», «kongemord», «folkevandring», «maktkamp»
@@ -56,6 +61,31 @@ worth pausing over — not a dry citation.
 Return a JSON array only, no other text. Each element: {{"text": "<vivid sentence>", "original": "<exact Wikipedia line>"}}
 If nothing is interesting enough, return: []"""
 
+_USER_TEMPLATE_NO = """\
+År: {year}
+Wikipedia-hendelser (én per linje):
+{events}
+
+Oppgave:
+1. Velg de 3–5 mest genuint interessante hendelsene — ting som avslører noe overraskende, menneskelig \
+eller viktig om {year}: bemerkelsesverdige personer, slag, oppdagelser, oppfinnelser, politiske \
+omveltninger, kulturelle milepæler.
+2. Skriv hver valgte hendelse om til én levende setning (maks 180 tegn). Gjør den engasjerende og \
+verdt å stoppe opp ved — ikke tørr sitering.
+3. Utelat: astronomiske hendelser, sportssesonger, lokale administrative vedtak, katalogoppføringer.
+
+Grammatikk og idiom — unngå disse konkrete feilene:
+- IKKE «brann krever 320 liv» → SKRIV «320 dør i brannen» / «320 omkomne»
+- IKKE «jordskjelvet krever 3000 liv» → SKRIV «3000 mister livet» / «3000 dør»
+- IKKE «et jordskjelv og tsunamien rammer» → SKRIV «Et jordskjelv og en tsunami rammer»
+- IKKE «noe som sårer samfunnet og reiser spørsmål om X» → del i to setninger: «Samfunnet blir preget. \
+Spørsmål om X kommer på dagsordenen.»
+- IKKE lang avslutningsfloskel limt på slutten av en fullstendig setning → avslutt skarpt, eller \
+lag floskelsetningen til en selvstendig påstand
+
+Returner kun en JSON-array, ingen annen tekst. Hvert element: {{"text": "<levende setning>", "original": "<nøyaktig Wikipedia-linje>"}}
+Hvis ingenting er interessant nok, returner: []"""
+
 
 def score_events(year: int, labels: list[str]) -> list[dict]:
     """Select and rephrase the most interesting events using gpt-4o-mini.
@@ -69,7 +99,9 @@ def score_events(year: int, labels: list[str]) -> list[dict]:
     if not labels:
         return []
 
-    system_prompt = _SYSTEM_PROMPT_NO if settings.lang == "no" else _SYSTEM_PROMPT_EN
+    is_norwegian = settings.lang == "no"
+    system_prompt = _SYSTEM_PROMPT_NO if is_norwegian else _SYSTEM_PROMPT_EN
+    user_template = _USER_TEMPLATE_NO if is_norwegian else _USER_TEMPLATE
 
     try:
         from openai import OpenAI
@@ -81,7 +113,7 @@ def score_events(year: int, labels: list[str]) -> list[dict]:
                 {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": _USER_TEMPLATE.format(
+                    "content": user_template.format(
                         year=year,
                         events="\n".join(labels),
                     ),
