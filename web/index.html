@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nb">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>What Year Does It Look Like?</title>
+  <title>Hvilket år ser det ut som?</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0d1117">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Year Clock">
+  <meta name="apple-mobile-web-app-title" content="Historieklokka">
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -407,16 +407,16 @@
 </head>
 <body>
   <div class="app-wrapper">
-    <p class="app-title">What Year Does It Look Like?</p>
+    <p class="app-title">Hvilket år ser det ut som?</p>
 
     <div class="clock-block">
       <div class="time-military" id="timeMilitary">
-        <span id="hhmm" title="Click to jump to a time">00:00</span><span class="seconds" id="ss">:00</span>
+        <span id="hhmm" title="Klikk for å hoppe til et tidspunkt">00:00</span><span class="seconds" id="ss">:00</span>
       </div>
     </div>
 
-    <button id="liveBtn" class="live-btn" aria-label="Return to live clock" hidden>
-      <span class="live-dot">●</span> Back to Live
+    <button id="liveBtn" class="live-btn" aria-label="Tilbake til direkte klokke" hidden>
+      <span class="live-dot">●</span> Tilbake til nå
     </button>
 
     <div class="year-card">
@@ -426,27 +426,27 @@
     </div>
 
     <div class="nav-row" id="navRow">
-      <button class="nav-btn" id="prevBtn">‹ Prev</button>
+      <button class="nav-btn" id="prevBtn">‹ Forrige</button>
       <span class="nav-status" id="navStatus"></span>
-      <button class="nav-btn" id="nextBtn">Next ›</button>
+      <button class="nav-btn" id="nextBtn">Neste ›</button>
     </div>
 
     <div class="event-card" id="eventCard">
-      <div class="event-card-header" id="eventHeader">Historical Event</div>
+      <div class="event-card-header" id="eventHeader">Historisk hendelse</div>
       <div class="event-text" id="eventText">
         <span class="loading-dots"><span></span><span></span><span></span></span>
       </div>
       <div class="event-source" id="eventSource"></div>
       <div class="era-context" id="eraContext" hidden></div>
       <div class="reaction-row" id="reactionRow" hidden>
-        <button class="rxn-btn" id="saveBtn" title="Save this fact">☆</button>
-        <button class="rxn-btn" id="dislikeBtn" title="Skip &amp; hide this event">✕</button>
+        <button class="rxn-btn" id="saveBtn" title="Lagre dette">☆</button>
+        <button class="rxn-btn" id="dislikeBtn" title="Hopp over &amp; skjul denne hendelsen">✕</button>
       </div>
     </div>
 
     <div class="timeline-bar" id="timelineBar">
       <input type="range" id="timelineSlider" min="0" max="1439" value="0"
-             aria-label="Navigate through the day">
+             aria-label="Naviger gjennom dagen">
       <div class="timeline-labels">
         <span>00:00</span>
         <span>06:00</span>
@@ -594,14 +594,14 @@
     }
 
     function eraLabel(year) {
-      if (year > CURRENT_YEAR) return 'The Future';
+      if (year > CURRENT_YEAR) return 'Fremtiden';
       const epochStr = formatEraDisplay(year);
       if (epochStr) return epochStr;
-      if (year === 0)  return 'Year Zero / 1 BC';
-      if (year < 0)    return 'BC';
-      if (year < 500)  return 'Late Antiquity';
-      if (year < 1000) return 'Early Medieval';
-      return 'Historical';
+      if (year === 0)  return 'År null / 1 f.Kr.';
+      if (year < 0)    return 'f.Kr.';
+      if (year < 500)  return 'Senantikken';
+      if (year < 1000) return 'Tidlig middelalder';
+      return 'Historisk';
     }
 
     function applyYearStyle(year) {
@@ -611,11 +611,11 @@
       elCard.classList.toggle('antiquity', isAntiquity && !isFuture);
 
       if (isFuture) {
-        elHeader.textContent = 'THE FUTURE';
+        elHeader.textContent = 'FREMTIDEN';
       } else if (isAntiquity) {
-        elHeader.textContent = 'Antiquity Event';
+        elHeader.textContent = 'Oldtidshendelse';
       } else {
-        elHeader.textContent = 'Historical Event';
+        elHeader.textContent = 'Historisk hendelse';
       }
     }
 
@@ -647,15 +647,15 @@
         elSource.innerHTML = '';
         elEraCtx.hidden = true;
         elEraCtx.textContent = '';
-        if (elHeader.textContent !== 'THE FUTURE') {
-          elHeader.textContent = elCard.classList.contains('antiquity') ? 'Antiquity Era' : 'Historical Era';
+        if (elHeader.textContent !== 'FREMTIDEN') {
+          elHeader.textContent = elCard.classList.contains('antiquity') ? 'Oldtidsepoke' : 'Historisk epoke';
         }
         currentEventData = null;
         updateReactionRow(displayYear, null, source, null);
       } else {
         elEvent.classList.remove('era-context-mode');
         const srcHtml = source
-          ? `Source: <a href="${sanitise(sourceUrl || '#')}" target="_blank" rel="noopener">${sanitise(source)}</a>`
+          ? `Kilde: <a href="${sanitise(sourceUrl || '#')}" target="_blank" rel="noopener">${sanitise(source)}</a>`
           : '';
         const counterHtml = counter ? ` <span style="opacity:0.5;font-size:0.85em">(${sanitise(counter)})</span>` : '';
         elSource.innerHTML = srcHtml + counterHtml;
@@ -680,7 +680,7 @@
 
     function showError(year) {
       elEvent.classList.remove('visible');
-      elEvent.textContent = `Exploring year ${year}… (offline)`;
+      elEvent.textContent = `Utforsker år ${year}… (frakoblet)`;
       elSource.textContent = '';
       requestAnimationFrame(() => {
         requestAnimationFrame(() => elEvent.classList.add('visible'));
@@ -725,8 +725,8 @@
         const futureEra = formatEraDisplay(year);
         return {
           text: futureEra
-            ? `Year ${year} hasn't happened yet. Era context: ${futureEra}`
-            : `Year ${year} hasn't happened yet.`,
+            ? `År ${year} har ikke skjedd ennå. Epokekontekst: ${futureEra}`
+            : `År ${year} har ikke skjedd ennå.`,
           source: null, url: null
         };
       }
@@ -786,7 +786,7 @@
         if (slider) slider.value = hh * 60 + mm;
       }
 
-      document.title = `${hhStr}:${mmStr} — What Year Does It Look Like?`;
+      document.title = `${hhStr}:${mmStr} — Hvilket år ser det ut som?`;
 
       const year = getYearFromTime(hh, mm);
 
@@ -846,12 +846,12 @@
       const liveBtn = document.getElementById('liveBtn');
       if (!el) return;
       if (viewingYear !== null) {
-        el.innerHTML = `Viewing ${viewingYear}<span class="browsing-badge">BROWSING</span>`;
+        el.innerHTML = `År ${viewingYear}<span class="browsing-badge">BLAR</span>`;
         document.getElementById('prevBtn').disabled = viewingYear <= 0;
         document.getElementById('nextBtn').disabled = viewingYear >= 2359;
         if (liveBtn) liveBtn.hidden = false;
       } else {
-        el.textContent = 'Live';
+        el.textContent = 'Direkte';
         document.getElementById('prevBtn').disabled = !lastYear || lastYear <= 0;
         document.getElementById('nextBtn').disabled = !lastYear || lastYear >= 2359;
         if (liveBtn) liveBtn.hidden = true;
@@ -997,7 +997,7 @@
       const btn = document.getElementById('saveBtn');
       btn.textContent = nowSaved ? '★' : '☆';
       btn.classList.toggle('saved', nowSaved);
-      btn.title = nowSaved ? 'Saved! Click to unsave' : 'Save this fact';
+      btn.title = nowSaved ? 'Lagret! Klikk for å fjerne' : 'Lagre dette';
     });
 
     document.getElementById('dislikeBtn').addEventListener('click', () => {
