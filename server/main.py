@@ -161,7 +161,7 @@ def debug_wikipedia(year: int = 1969):
         return {"status": "error", "detail": str(exc), "year": year}
 
 
-@app.get("/api/v1/config")
+@router.get("/config")
 def get_config():
     """Return deployment configuration for the frontend: language and epoch data."""
     return {
