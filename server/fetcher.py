@@ -196,10 +196,10 @@ def fetch_wikipedia_events(year: int) -> list[str]:
         return []
 
 
-def fetch_wikidata_events(year: int) -> list[str]:
+def fetch_wikidata_events(year: int) -> list[dict]:
     """
     Fetch events from Wikipedia's year article.
-    Returns scored/filtered event strings, or [] if no article exists.
+    Returns scored/rephrased event dicts, or [] if no article exists.
 
     Wikidata SPARQL is no longer used — it reliably times out (30s+) for
     year-filtered queries regardless of rate limiting. Era context handles
@@ -215,12 +215,18 @@ def fetch_wikidata_events(year: int) -> list[str]:
 
 def get_events_for_year(year: int) -> list[dict]:
     """Return cached events or fetch from Wikipedia.
-    Returns list of {text, source} dicts."""
+    Returns list of {text, source, original?} dicts."""
     cached = get_cached_events(year)
     if cached is not None:
         return cached
-    labels = fetch_wikidata_events(year)
-    events = [{"text": t, "source": "Wikipedia"} for t in labels]
+    scored = fetch_wikidata_events(year)
+    events = []
+    for item in scored:
+        event = {"text": item.get("text", ""), "source": "Wikipedia"}
+        if "original" in item:
+            event["original"] = item["original"]
+        events.append(event)
+    events = [e for e in events if e["text"]]
     if events:
         store_events(year, events)
     return events

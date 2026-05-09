@@ -86,9 +86,9 @@ def _seconds_until_next_4am_utc() -> float:
 
 async def rescore_cache() -> None:
     """
-    Re-run LLM scoring over all cached entries.
-    Called nightly when YEARCLOCK_LLM_SCORING is enabled, so that entries
-    stored before scoring was activated get cleaned up on the next 04:00 pass.
+    Re-run LLM scoring (and rephrasing) over all cached entries.
+    Called nightly when YEARCLOCK_LLM_SCORING is enabled.
+    Uses the stored 'original' Wikipedia text when available, falls back to 'text'.
     No-op if LLM scoring is disabled or OPENAI_API_KEY is unset.
     """
     if not settings.llm_scoring_enabled:
@@ -100,12 +100,21 @@ async def rescore_cache() -> None:
     rescored = 0
     for year, events in entries:
         try:
-            labels = [e["text"] for e in events]
-            filtered_set = set(score_events(year, labels))
-            if len(filtered_set) < len(labels):
+            # Use stored original Wikipedia text when available
+            labels = [e.get("original") or e["text"] for e in events]
+            scored = score_events(year, labels)
+            if not scored:
+                continue
+            new_events = []
+            for item in scored:
+                event = {"text": item.get("text", ""), "source": "Wikipedia"}
+                if "original" in item:
+                    event["original"] = item["original"]
+                if event["text"]:
+                    new_events.append(event)
+            if new_events and new_events != events:
                 from clockapp.server.db import store_events
-                filtered_events = [e for e in events if e["text"] in filtered_set]
-                store_events(year, filtered_events)
+                store_events(year, new_events)
                 rescored += 1
         except Exception as exc:
             logger.warning("Rescore failed for year %d: %s", year, exc)
