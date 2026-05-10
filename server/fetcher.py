@@ -177,7 +177,12 @@ def fetch_wikipedia_events(year: int) -> list[str]:
             wikitext,
             re.DOTALL | re.MULTILINE,
         )
-        section = m.group(1) if m else wikitext  # fall back to full text if no section found
+        if not m:
+            # No Events section → article is not a year article (vandalism, redirect to
+            # unrelated topic, etc.).  Return [] so era-context fallback handles it cleanly.
+            logger.info("Wikipedia: year %d — no Events section found (title=%r)", year, title)
+            return []
+        section = m.group(1)
         bullets = re.findall(r'^\*+\s*(.+)$', section, re.MULTILINE)
 
         events: list[str] = []
