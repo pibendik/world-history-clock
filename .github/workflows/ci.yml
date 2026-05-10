@@ -36,7 +36,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-                    script: |
+          script: |
             set -e
             cd /opt/historieklokka
             git pull --ff-only
