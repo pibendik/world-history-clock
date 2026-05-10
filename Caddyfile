@@ -15,12 +15,28 @@
     }
 
     # Proxy all /api/ requests to the FastAPI backend
+    # Rate limit: 30 req/min per IP (burst of 10) — protects OpenAI spend
     handle /api/* {
+        rate_limit {
+            zone api {
+                key    {remote_ip}
+                window 60s
+                events 30
+            }
+        }
         reverse_proxy api:8421
     }
 
     # Serve PWA static files; fall back to index.html for SPA routing
+    # Rate limit: 120 req/min per IP — generous for normal browsing
     handle {
+        rate_limit {
+            zone static {
+                key    {remote_ip}
+                window 60s
+                events 120
+            }
+        }
         root * /srv/web
         try_files {path} /index.html
         file_server
