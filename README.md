@@ -46,13 +46,10 @@ clockapp/
 │   ├── config.py               # Innstillinger (miljøvariabler med YEARCLOCK_-prefiks)
 │   └── Dockerfile
 ├── data/
-│   ├── epochs.py               # Språkbevisst laster for JSON-datafilene
-│   ├── epochs.json             # 51 tidsaldre med engelske navn og datointervaller
-│   ├── epochs.no.json          # 51 tidsaldre med norske navn
-│   ├── era_context.json        # ~70 engelske erakontekstsetninger
-│   ├── era_context.no.json     # ~70 norske erakontekstsetninger (østlandsk bokmål)
-│   ├── future_events.json      # Kuraterte fremtidshendelser (engelsk)
-│   └── future_events.no.json   # Kuraterte fremtidshendelser (norsk)
+│   ├── epochs.py               # Language-aware loader for JSON data files
+│   ├── epochs.json             # 51 eras with English names and date ranges
+│   ├── era_context.json        # ~70 English era context sentences
+│   └── future_events.json      # Curated future events (2026–2359)
 ├── tests/                      # pytest — 50 tester
 ├── _archived/                  # Utdaterte terminal- og Flutter-versjoner
 ├── docker-compose.yml          # Lokal utvikling
@@ -165,7 +162,88 @@ Buffervarmeren kjører nightly kl. 04:00 UTC. Den starter fra nåværende time, 
 
 ---
 
-## Terminalversjoner *(arkivert)*
+## Ops Runbook
+
+Quick reference for keeping the production server healthy.
+
+### Check logs
+
+```bash
+ssh root@77.42.120.231
+cd /opt/historieklokka
+
+# Live API logs
+docker compose -f docker-compose.prod.yml logs -f api
+
+# Live Caddy (access + TLS) logs
+docker compose -f docker-compose.prod.yml logs -f caddy
+
+# Structured access log (JSON)
+tail -f /var/log/caddy/access.log | jq .
+```
+
+### Restart services
+
+```bash
+ssh root@77.42.120.231
+cd /opt/historieklokka
+
+docker compose -f docker-compose.prod.yml restart api
+docker compose -f docker-compose.prod.yml restart caddy
+```
+
+### Rollback
+
+```bash
+ssh root@77.42.120.231
+cd /opt/historieklokka
+
+git log --oneline -10          # find the commit to roll back to
+git checkout <commit-sha>      # detached HEAD — site runs old code
+docker compose -f docker-compose.prod.yml up -d --build api caddy
+
+# To return to latest main:
+git checkout main && git pull
+docker compose -f docker-compose.prod.yml up -d --build api caddy
+```
+
+### Force cache clear (re-fetch all years from Wikipedia)
+
+```bash
+# From local machine — redeploys and flushes SQLite event cache:
+./deploy.sh root@77.42.120.231 --clear-cache
+
+# Or on the server directly:
+ssh root@77.42.120.231
+cd /opt/historieklokka
+docker compose -f docker-compose.prod.yml exec api python -c \
+  "from clockapp.server.db import get_db; db=next(get_db()); db.execute('DELETE FROM event_cache'); db.commit()"
+docker compose -f docker-compose.prod.yml restart api
+```
+
+### Check OpenAI spend
+
+1. Go to [platform.openai.com/usage](https://platform.openai.com/usage)
+2. Model: `gpt-4o-mini` — typical cost is a few cents per day
+3. Set a **hard monthly limit** at platform.openai.com/account/limits to cap surprise costs
+
+### Health check
+
+```bash
+curl https://historieklokka.no/health
+# Expected: {"status":"ok"}
+```
+
+### Rate limit hits (HTTP 429)
+
+Caddy returns 429 when a single IP exceeds 30 req/min on `/api/*` or 120 req/min on static files. Check access log:
+
+```bash
+cat /var/log/caddy/access.log | jq 'select(.status==429)'
+```
+
+---
+
 
 De opprinnelige terminalprototypene ligger i `_archived/` for referanse.  
 De vedlikeholdes ikke og kan være utdaterte.
