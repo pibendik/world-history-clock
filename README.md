@@ -242,6 +242,19 @@ Caddy returns 429 when a single IP exceeds 30 req/min on `/api/*` or 120 req/min
 cat /var/log/caddy/access.log | jq 'select(.status==429)'
 ```
 
+### Update Python dependencies
+
+Dependencies are pinned via [pip-tools](https://pip-tools.readthedocs.io/).
+Edit `server/requirements.in` (abstract deps), then regenerate the lockfile:
+
+```bash
+cd clockapp/
+pip install pip-tools          # one-time
+pip-compile server/requirements.in --output-file server/requirements.txt --strip-extras --annotation-style line
+```
+
+Commit both `requirements.in` and `requirements.txt`. The Docker build uses `requirements.txt`.
+
 ---
 
 
