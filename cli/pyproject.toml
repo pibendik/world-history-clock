@@ -5,13 +5,36 @@ build-backend = "hatchling.build"
 [project]
 name = "historieklokka"
 version = "0.1.0"
-description = "Historieklokka — historieklokkа i terminalen"
+description = "A history clock for the terminal — military time HH:MM becomes a historical year with a fact from that year."
 readme = "README.md"
+license = "GPL-3.0-only"
 requires-python = ">=3.9"
+keywords = ["history", "clock", "terminal", "tui", "wikipedia"]
+authors = [
+    { name = "pibendik", url = "https://github.com/pibendik" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+    "Topic :: Education",
+]
 dependencies = [
     "rich>=13.0",
     "requests>=2.28",
 ]
+
+[project.urls]
+Homepage = "https://historieklokka.no"
+Repository = "https://github.com/pibendik/world-history-clock"
+"Bug Tracker" = "https://github.com/pibendik/world-history-clock/issues"
 
 [project.scripts]
 historieklokka = "historieklokka.app:main"
