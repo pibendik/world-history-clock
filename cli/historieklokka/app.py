@@ -62,10 +62,10 @@ def build_header() -> Panel:
 def build_clock(now: datetime) -> Panel:
     content = Text(justify="center")
     content.append(now.strftime("%H:%M:%S") + "\n", style="bold bright_green")
-    content.append(now.strftime("%-d. %B %Y"), style="dim white")
+    content.append(now.strftime("%B %-d, %Y"), style="dim white")
     return Panel(
         content,
-        title="[bold green]Klokken[/bold green]",
+        title="[bold green]Clock[/bold green]",
         border_style="green",
         box=box.ROUNDED,
         padding=(1, 2),
@@ -77,9 +77,9 @@ def build_year_panel(year: int, data: "dict | None") -> Panel:
     content = Text(justify="center")
     content.append(str(year), style=f"{theme['color']} underline")
     if year > _CURRENT_YEAR:
-        content.append("  FREMTID", style=theme["color"])
+        content.append("  FUTURE", style=theme["color"])
     elif year < 100:
-        content.append("  OLDTID", style=theme["color"])
+        content.append("  ANTIQUITY", style=theme["color"])
 
     if data:
         era = data.get("era_display") or ""
@@ -88,28 +88,28 @@ def build_year_panel(year: int, data: "dict | None") -> Panel:
         if era:
             content.append(f"\n\n{era}", style="dim white")
 
-    title = "[bold magenta]Fremtid[/bold magenta]" if year > _CURRENT_YEAR else "[bold]År[/bold]"
+    title = "[bold magenta]Future[/bold magenta]" if year > _CURRENT_YEAR else "[bold]Year[/bold]"
     return Panel(content, title=title, border_style=theme["border"], box=box.ROUNDED, padding=(1, 2))
 
 
 def build_event_panel(year: int, data: "dict | None", fetching: bool, error: bool) -> Panel:
     theme = _theme(year)
     title = (
-        f"[bold magenta]I fremtiden ({year})...[/bold magenta]"
+        f"[bold magenta]In the future ({year})...[/bold magenta]"
         if year > _CURRENT_YEAR
-        else f"[bold]I {year}...[/bold]"
+        else f"[bold]In {year}...[/bold]"
     )
 
     if fetching:
         spinner = SPINNER_FRAMES[int(time.time() * 8) % len(SPINNER_FRAMES)]
         return Panel(
-            Text(f"{spinner} henter fra historieklokka.no…", style="dim yellow"),
+            Text(f"{spinner} fetching from historieklokka.no…", style="dim yellow"),
             title=title, border_style=theme["border"], box=box.ROUNDED, padding=(1, 2),
         )
 
     if error or data is None:
         return Panel(
-            Text("Kunne ikke nå historieklokka.no — sjekk nettverkstilkoblingen.", style="dim red"),
+            Text("Could not reach historieklokka.no — check your network connection.", style="dim red"),
             title=title, border_style="red", box=box.ROUNDED, padding=(1, 2),
         )
 
@@ -118,7 +118,7 @@ def build_event_panel(year: int, data: "dict | None", fetching: bool, error: boo
 
     if not event_text:
         return Panel(
-            Text(f"(Ingen hendelser funnet for år {year})", style="dim yellow"),
+            Text(f"(No events found for year {year})", style="dim yellow"),
             title=title, border_style=theme["border"], box=box.ROUNDED, padding=(1, 2),
         )
 
@@ -130,7 +130,7 @@ def build_event_panel(year: int, data: "dict | None", fetching: bool, error: boo
     if events and "original" in events[0]:
         source_label = "Wikipedia"
     elif year > _CURRENT_YEAR:
-        source_label = "kurert"
+        source_label = "curated"
 
     return Panel(
         content,
@@ -192,7 +192,7 @@ def make_layout() -> Layout:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Historieklokka i terminalen")
+    parser = argparse.ArgumentParser(description="Historieklokka — history clock in the terminal")
     parser.add_argument(
         "--api",
         default=DEFAULT_API,
@@ -227,5 +227,5 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nHa det!")
+        print("\nGoodbye!")
         sys.exit(0)
