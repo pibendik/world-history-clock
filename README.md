@@ -55,18 +55,27 @@ clockapp/
 │   ├── scorer.py               # LLM-kvalitetsscoring (OpenAI gpt-4o-mini)
 │   ├── db.py                   # SQLite: event_cache, reactions, saved_facts, era_exposure
 │   ├── config.py               # Innstillinger (miljøvariabler med YEARCLOCK_-prefiks)
+│   ├── requirements.in         # Abstrakte avhengigheter (kilde for pip-compile)
+│   ├── requirements.txt        # Låst avhengighetsliste (pip-compile-generert)
 │   └── Dockerfile
+├── cli/                        # Terminal-app (publisert på PyPI som «historieklokka»)
+│   ├── historieklokka/app.py   # Rich TUI — klokke + hendelse + erakontekst
+│   ├── pyproject.toml          # Pakke-metadata, GPL-3.0-only
+│   └── README.md               # Installasjon og bruksveiledning (engelsk)
 ├── data/
 │   ├── epochs.py               # Language-aware loader for JSON data files
 │   ├── epochs.json             # 51 eras with English names and date ranges
 │   ├── era_context.json        # ~70 English era context sentences
 │   └── future_events.json      # Curated future events (2026–2359)
+├── docs/
+│   └── known-issues.md         # Hendelseslogg: Wikipedia-datakvalitetsproblemer
 ├── tests/                      # pytest — 50 tester
 ├── _archived/                  # Utdaterte terminal- og Flutter-versjoner
 ├── docker-compose.yml          # Lokal utvikling
 ├── docker-compose.prod.yml     # Produksjon (Caddy + auto-HTTPS)
 ├── Caddyfile                   # Caddy reverse proxy-konfig
 ├── deploy.sh                   # Én-kommando-deploy
+├── LICENSE                     # GPL-3.0-only
 ├── .env.example                # Konfigurasjonsreferanse
 └── SERVER-SETUP.md             # Serveroppsett
 ```
@@ -158,6 +167,7 @@ Buffervarmeren kjører nightly kl. 04:00 UTC. Den starter fra nåværende time, 
 - ✕ **Misliker** — hopp over en hendelse og skjul den fra fremtidig rotasjon
 - 🔮 **Fremtidssone** — kuraterte hendelser for årstall 2026–2359
 - 📱 **PWA** — fungerer som hjemskjermapp på Android/iOS
+- 💻 **Terminal-app** — `pip install historieklokka` for Rich TUI i terminalen
 
 ---
 
@@ -169,7 +179,8 @@ Buffervarmeren kjører nightly kl. 04:00 UTC. Den starter fra nåværende time, 
 - Hendelsestekst: norsk bokmål (skrevet av LLM med østlandsk stil-prompt)
 - Fremtidshendelser: norsk bokmål (`data/future_events.no.json`)
 - Erakontekst: norsk bokmål (`data/era_context.no.json`)
-- Engelsk versjon: planlagt som separat domene med `YEARCLOCK_LANG=en`; all infrastruktur er klar
+- **Terminal-app (`historieklokka` på PyPI): engelsk** — eget målgruppe
+- Engelsk nett-versjon: planlagt som separat domene med `YEARCLOCK_LANG=en`; all infrastruktur er klar
 
 ---
 
@@ -265,6 +276,22 @@ pip-compile server/requirements.in --output-file server/requirements.txt --strip
 ```
 
 Commit both `requirements.in` and `requirements.txt`. The Docker build uses `requirements.txt`.
+
+---
+
+### Publish CLI update to PyPI
+
+```bash
+# 1. Bump version in cli/pyproject.toml  (e.g. 0.1.1 → 0.1.2)
+# 2. Build and publish:
+cd cli/
+source ../../venv/bin/activate
+rm -rf dist/
+hatch build
+HATCH_INDEX_USER=__token__ HATCH_INDEX_AUTH="$(awk '/password/{print $3}' ~/.pypirc)" hatch publish
+```
+
+PyPI rejects duplicate versions — always bump before publishing.
 
 ---
 

@@ -29,19 +29,18 @@ Press `Ctrl+C` to exit.
 ## Publishing to PyPI
 
 ```bash
-# One-time setup
-pip install hatch
-
-# Build
+# 1. Bump version in pyproject.toml
+# 2. Build and publish:
 cd cli/
-hatch build              # creates dist/historieklokka-*.whl and .tar.gz
-
-# Publish (requires PyPI account + API token at https://pypi.org/manage/account/token/)
-hatch publish            # prompts for username (__token__) and token
+source ../../venv/bin/activate   # or whichever venv has hatch installed
+rm -rf dist/
+hatch build
+HATCH_INDEX_USER=__token__ HATCH_INDEX_AUTH="$(awk '/password/{print $3}' ~/.pypirc)" hatch publish
 ```
 
-Set `HATCH_INDEX_USER=__token__` and `HATCH_INDEX_AUTH=pypi-...` as environment variables
-to skip the prompts.
+PyPI rejects duplicate versions — always bump `version` in `pyproject.toml` first.
+Token lives in `~/.pypirc` (and `~/.config/hatch/config.toml`). Rotate at
+[pypi.org/manage/account/token/](https://pypi.org/manage/account/token/) if compromised.
 
 ## License
 
