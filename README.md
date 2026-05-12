@@ -2,6 +2,17 @@
 
 > *Hvordan ser klokken ut som et årstall?*
 
+## Prøv i terminalen
+
+```bash
+pip install historieklokka
+historieklokka
+```
+
+Krever Python 3.10+. Kobler til [historieklokka.no](https://historieklokka.no) live — ingen konfig nødvendig.
+
+---
+
 En progressiv nettapp (PWA) som oversetter nåværende klokkeslett til et historisk årstall og viser en kuriert hendelse fra det året. **15:23** viser noe fra **1523**. **09:07** viser noe fra **907**. **21:49** viser noe fra **2149** — som ennå ikke har skjedd.
 
 **Live på [historieklokka.no](https://historieklokka.no)**

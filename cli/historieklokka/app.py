@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Historieklokka — historieklokkа i terminalen.
+"""Historieklokka — history clock in the terminal.
 
-Viser hva klokken ser ut som som et historisk årstall og en hendelse fra det året,
-hentet fra historieklokka.no.
+Shows what the current time looks like as a historical year,
+with an event from that year fetched from historieklokka.no.
 
-Bruk: historieklokka [--api URL]
+Usage: historieklokka [--api URL]
 """
 
 import argparse
@@ -125,6 +125,11 @@ def build_event_panel(year: int, data: "dict | None", fetching: bool, error: boo
     content = Text()
     content.append("• ", style=theme["bullet"])
     content.append(event_text, style="white")
+
+    context_text = data.get("context", "")
+    if context_text and context_text != event_text:
+        content.append("\n\n")
+        content.append(context_text, style="dim")
 
     source_label = ""
     if events and "original" in events[0]:

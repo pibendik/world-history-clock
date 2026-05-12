@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "historieklokka"
-version = "0.1.0"
+version = "0.1.1"
 description = "A history clock for the terminal — military time HH:MM becomes a historical year with a fact from that year."
 readme = "README.md"
 license = "GPL-3.0-only"
